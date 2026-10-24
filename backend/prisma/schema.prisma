@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  KASIR
+}
+
+model User {
+  userId    String   @id @default(uuid())
+  code      String   @unique
+  name      String
+  username  String   @unique
+  password  String
+  role      Role
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String?
+  updatedBy String?
+
+  transactions Transaction[]
+}
+
+model Category {
+  categoryId String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  createdBy  String
+  updatedBy  String
+
+  products   Product[]
+}
+
+model Supplier {
+    supplierId String @id @default(uuid())
+    code       String @unique
+    name       String
+
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+    createdBy  String
+    updatedBy  String
+
+    products Product[]
+}
+
+model Product {
+  productId  String   @id @default(uuid())
+  code       String   @unique
+  name       String
+  price      Decimal
+  supplier   Supplier @relation(fields: [supplierId], references: [supplierId])
+  supplierId String
+  stock      Int
+  unit       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  createdBy  String
+  updatedBy  String
+
+  category         Category          @relation(fields: [categoryId], references: [categoryId])
+  categoryId       String
+
+  transactionItems TransactionItem[]
+  stockMovement StockMovement[]
+}
+
+enum PaymentMethod {
+    QRIS
+    CASH
+    TRANSFER
+}
+
+model Transaction {
+  transactionId String   @id @default(uuid())
+  code          String   @unique
+  totalPrice    Decimal
+  createdAt     DateTime @default(now())
+
+  kasir    User              @relation(fields: [kasirId], references: [userId])
+  kasirId  String
+
+  paymentMethod PaymentMethod
+
+  items    TransactionItem[]
+}
+
+model TransactionItem {
+  transactionItemId String  @id @default(uuid())
+  code              String  @unique
+  quantity          Int
+  priceAtTime       Decimal
+
+  transaction   Transaction @relation(fields: [transactionId], references: [transactionId])
+  transactionId String
+
+  product       Product @relation(fields: [productId], references: [productId])
+  productId     String
+}
+
+enum Reason {
+    PURCHASE
+    ADJUSTMENT
+    RETURN
+}
+
+model StockMovement {
+  stockMovementId String  @id @default(uuid())
+  product   Product @relation(fields: [productId], references: [productId])
+  productId String
+  code              String  @unique
+  quantity          Int
+  reason        Reason
+
+  createdAt     DateTime  @default(now())
+  createdBy     String
+}
