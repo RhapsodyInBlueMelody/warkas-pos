@@ -197,17 +197,17 @@ describe('peran dan stok', () => {
         const a = await registerStore('race')
         const p = await createProduct(a.token, { stock: 10 })
 
-        const body = { items: [{ productId: p.productId, quantity: 6 }], paymentMethod: 'CASH' }
-        const [r1, r2] = await Promise.all([
-            call('POST', '/transaction', a.token, body),
-            call('POST', '/transaction', a.token, body),
-        ])
-
-        const statuses = [r1.status, r2.status].sort()
-        expect(statuses).toEqual([201, 400])
+        // 20 checkout serentak masing-masing 1 barang terhadap stok 10: tepat 10 yang boleh lolos.
+        // Dua permintaan saja terlalu mudah lolos secara kebetulan tanpa pengecekan atomik.
+        const body = { items: [{ productId: p.productId, quantity: 1 }], paymentMethod: 'CASH' }
+        const results = await Promise.all(
+            Array.from({ length: 20 }, () => call('POST', '/transaction', a.token, body))
+        )
+        expect(results.filter(r => r.status === 201).length).toBe(10)
+        expect(results.filter(r => r.status === 400).length).toBe(10)
 
         const after = await call('GET', '/products', a.token)
-        expect(after.body.products.find((x: any) => x.productId === p.productId).stock).toBe(4)
+        expect(after.body.products.find((x: any) => x.productId === p.productId).stock).toBe(0)
     })
 
     test('stok tidak cukup ditolak dan harga ditentukan server', async () => {

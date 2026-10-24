@@ -93,6 +93,47 @@ async function main() {
         }
     }
 
+    // Contoh bon: Bu Ani berutang 35000 dari penjualan BON, lalu mencicil 15000 (sisa 20000).
+    const ani = await prisma.customer.create({
+        data: { name: 'Bu Ani', phone: '081200000001', storeId: store.storeId, createdBy: owner.userId }
+    })
+    const bonProduct = products[0]
+    const bonTotal = bonProduct.price.mul(10)
+    await prisma.transaction.create({
+        data: {
+            code: 'TRXSEEDBON1',
+            totalPrice: bonTotal,
+            storeId: store.storeId,
+            kasirId: kasir.userId,
+            paymentMethod: 'BON',
+            customerId: ani.customerId,
+            items: {
+                create: [{
+                    code: 'TRXITEMSEEDBON1',
+                    quantity: 10,
+                    priceAtTime: bonProduct.price,
+                    costAtTime: bonProduct.costPrice,
+                    productId: bonProduct.productId,
+                }]
+            },
+            debtEntry: {
+                create: {
+                    type: 'CHARGE',
+                    amount: bonTotal,
+                    storeId: store.storeId,
+                    customerId: ani.customerId,
+                    createdBy: kasir.userId,
+                }
+            },
+        }
+    })
+    await prisma.debtEntry.create({
+        data: {
+            type: 'PAYMENT', amount: 15000, note: 'cicilan pertama',
+            storeId: store.storeId, customerId: ani.customerId, createdBy: kasir.userId,
+        }
+    })
+
     console.log('Seed sukses. Login demo: username "demo" (pemilik) atau "demo.kasir".')
 }
 

@@ -9,7 +9,7 @@ Warkas adalah kasir digital multi-toko untuk warung dan toko kecil. Basis kodeny
 - [x] M0 Baseline: salinan KOSAI POS apa adanya (`backend/`, `mobile/`)
 - [x] M1 Multi-tenant: `Store`, `storeId` di semua tabel, kode unik per toko, JWT membawa `storeId`, `POST /register`, isolasi data + tes lintas toko (12 tes lulus di Postgres 16 lokal)
 - [x] M2 Harga modal, laporan untung harian, penanda stok menipis (18 tes lulus)
-- [ ] M3 Buku bon (utang pelanggan)
+- [x] M3 Buku bon (utang pelanggan) (29 tes lulus)
 - [ ] M4 Batas paket gratis (50 barang), ekspor Excel. Paket berbayar hanya flag di database (belum ada pembayaran)
 - [ ] M5 Aplikasi mobile: rebrand ke Warkas, layar daftar toko, bon, laporan
 - [ ] M6 Samakan proposal dan landing page dengan fitur yang benar-benar jadi
@@ -53,4 +53,14 @@ bun prisma/seed.ts     # data demo: username demo / demo.kasir, password demo123
 - `GET /products/low-stock` dan field `lowStock` di `GET /products` (stok <= minStock).
 - Kasir tidak menerima `costPrice` maupun `costAtTime`, dan mendapat 403 di laporan.
 - Laporan mingguan/bulanan belum ada (landing page menjanjikannya untuk paket Toko); dikerjakan bersama M4.
-- Seed: produk "Keripik Singkong" sengaja menipis; transaksi demo berumur 1-5 hari, jadi laporan hari ini kosong tetapi `?date=` kemarin berisi.
+- Seed: produk "Keripik Singkong" sengaja menipis; transaksi demo berumur 1-5 hari (laporan `?date=` kemarin berisi); satu transaksi BON hari ini untuk Bu Ani.
+
+## Catatan M3
+
+- Migrasi `20261024140000_add_debt_ledger`: enum `PaymentMethod` + `BON`, tabel `Customer` dan `DebtEntry`, `Transaction.customerId`. Ada `CHECK (amount > 0)` di `DebtEntry` yang ditulis tangan di SQL dan tidak muncul di `schema.prisma`. Migrasi ditulis tangan mengikuti gaya Prisma dan belum diverifikasi dengan `prisma migrate diff`; bila `prisma migrate dev` kelak mengusulkan migrasi koreksi, periksa dulu apakah itu hanya perbedaan kosmetik.
+- Buku bon berupa buku besar (hanya ditambah): `CHARGE` menambah utang, `PAYMENT` mengurangi. Sisa utang = jumlah CHARGE - jumlah PAYMENT. Tidak ada status lunas yang disimpan; `settled` dihitung.
+- Endpoint: `GET/POST /customers`, `GET/PATCH /customers/:id`, `POST /customers/:id/payments` (kasir dan pemilik), `POST /customers/:id/charges` (hanya pemilik, untuk memindahkan catatan bon kertas).
+- Checkout `paymentMethod: "BON"` wajib `customerId` dan membuat CHARGE dalam transaksi database yang sama dengan potong stok. Metode lain dengan `customerId` ditolak.
+- Pembayaran melebihi sisa utang ditolak (400). Pembayaran memakai `SELECT ... FOR UPDATE` pada baris pelanggan; tes balapan 12 pembayaran serentak gagal bila kunci itu dibuang (diverifikasi dengan mutasi manual). Tes balapan stok checkout (20 serentak) juga diperkuat dan diverifikasi dengan cara yang sama.
+- Laporan harian kini memuat `byPayment.BON`, `debtPaymentsReceived`, `cashIn` (uang yang benar-benar masuk), dan `debtOutstanding`. `revenue` dan `profit` tetap berbasis penjualan (termasuk bon).
+- Belum ada: batas kredit per pelanggan, pengingat tagihan, hapus/gabung pelanggan, koreksi pembayaran yang salah catat (saat ini hanya bisa dikoreksi dengan CHARGE manual oleh pemilik).

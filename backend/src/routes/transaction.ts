@@ -12,6 +12,7 @@ const paymentMethodSchema = t.Union([
     t.Literal('QRIS'),
     t.Literal('CASH'),
     t.Literal('TRANSFER'),
+    t.Literal('BON'),
 ]);
 
 class TransactionInputError extends Error {}
@@ -25,8 +26,17 @@ export const transactionRoutes = new Elysia()
                 return { message: 'Transaksi Gagal!', detail: 'Sesi kasir tidak valid.' };
             }
 
-            const { items, paymentMethod } = body;
+            const { items, paymentMethod, customerId } = body;
             const { storeId } = user;
+
+            if (paymentMethod === 'BON' && !customerId) {
+                set.status = 400;
+                return { message: 'Transaksi Gagal!', detail: 'Pilih pelanggan untuk transaksi bon.' };
+            }
+            if (paymentMethod !== 'BON' && customerId) {
+                set.status = 400;
+                return { message: 'Transaksi Gagal!', detail: 'Pelanggan hanya dipakai untuk transaksi bon.' };
+            }
 
             const productIds = new Set(items.map(item => item.productId));
             if (productIds.size !== items.length) {
@@ -41,6 +51,16 @@ export const transactionRoutes = new Elysia()
             const transactionCode = `TRX${date}${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 
             const result = await prisma.$transaction(async (tx) => {
+                if (paymentMethod === 'BON') {
+                    const customer = await tx.customer.findFirst({
+                        where: { customerId, storeId },
+                        select: { customerId: true },
+                    });
+                    if (!customer) {
+                        throw new TransactionInputError('Pelanggan tidak ditemukan.');
+                    }
+                }
+
                 // Hanya produk milik toko ini yang bisa dijual. Produk toko lain
                 // diperlakukan sama seperti produk yang tidak ada.
                 const products = await Promise.all(
@@ -83,6 +103,7 @@ export const transactionRoutes = new Elysia()
                         storeId,
                         kasirId: user.userId,
                         paymentMethod,
+                        customerId: paymentMethod === 'BON' ? customerId : undefined,
                     }
                 });
 
@@ -121,6 +142,21 @@ export const transactionRoutes = new Elysia()
                     }
                 }
 
+                // Transaksi BON menambah utang dalam transaksi database yang sama:
+                // kalau stok gagal dipotong, utang juga tidak tercatat.
+                if (paymentMethod === 'BON' && customerId) {
+                    await tx.debtEntry.create({
+                        data: {
+                            type: 'CHARGE',
+                            amount: totalPrice,
+                            storeId,
+                            customerId,
+                            transactionId: transaction.transactionId,
+                            createdBy: user.userId,
+                        }
+                    });
+                }
+
                 return transaction;
             });
 
@@ -146,6 +182,7 @@ export const transactionRoutes = new Elysia()
         body: t.Object({
             items: t.Array(transactionItemSchema, { minItems: 1 }),
             paymentMethod: paymentMethodSchema,
+            customerId: t.Optional(t.String({ minLength: 1 })),
         })
     })
     .get('/transactions', async ({ user, set }) => {
@@ -163,6 +200,7 @@ export const transactionRoutes = new Elysia()
                 },
                 include: {
                     kasir: { select: { name: true } },
+                    customer: { select: { customerId: true, name: true } },
                     items: {
                         include: {
                             product: {

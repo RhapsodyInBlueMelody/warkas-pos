@@ -43,7 +43,7 @@ export const reportRoutes = new Elysia()
 
         const where = { storeId: user.storeId, createdAt: { gte: range.from, lt: range.to } }
 
-        const [transactions, items] = await Promise.all([
+        const [transactions, items, paymentsAgg, ledger] = await Promise.all([
             prisma.transaction.findMany({
                 where,
                 select: { totalPrice: true, paymentMethod: true },
@@ -57,6 +57,17 @@ export const reportRoutes = new Elysia()
                     product: { select: { productId: true, name: true } },
                 },
             }),
+            // Uang masuk dari pelunasan/cicilan bon pada hari ini.
+            prisma.debtEntry.aggregate({
+                where: { storeId: user.storeId, type: 'PAYMENT', createdAt: { gte: range.from, lt: range.to } },
+                _sum: { amount: true },
+            }),
+            // Sisa seluruh utang pelanggan saat ini (bukan hanya hari ini).
+            prisma.debtEntry.groupBy({
+                by: ['type'],
+                where: { storeId: user.storeId },
+                _sum: { amount: true },
+            }),
         ])
 
         let revenue = ZERO()
@@ -64,6 +75,7 @@ export const reportRoutes = new Elysia()
             CASH: { count: 0, revenue: ZERO() },
             QRIS: { count: 0, revenue: ZERO() },
             TRANSFER: { count: 0, revenue: ZERO() },
+            BON: { count: 0, revenue: ZERO() },
         }
         for (const trx of transactions) {
             revenue = revenue.plus(trx.totalPrice)
@@ -94,6 +106,15 @@ export const reportRoutes = new Elysia()
             perProduct.set(item.product.productId, current)
         }
 
+        const debtPaymentsReceived = paymentsAgg._sum.amount ?? ZERO()
+        let debtOutstanding = ZERO()
+        for (const row of ledger) {
+            const sum = row._sum.amount ?? ZERO()
+            debtOutstanding = row.type === 'CHARGE' ? debtOutstanding.plus(sum) : debtOutstanding.minus(sum)
+        }
+        // Uang yang benar-benar masuk hari ini: penjualan non-bon + pelunasan bon.
+        const cashIn = revenue.minus(byPayment.BON.revenue).plus(debtPaymentsReceived)
+
         const topProducts = [...perProduct.entries()]
             .map(([productId, v]) => ({ productId, name: v.name, quantity: v.quantity, revenue: Number(v.revenue) }))
             .sort((a, b) => b.revenue - a.revenue)
@@ -114,7 +135,12 @@ export const reportRoutes = new Elysia()
                 CASH: { count: byPayment.CASH.count, revenue: Number(byPayment.CASH.revenue) },
                 QRIS: { count: byPayment.QRIS.count, revenue: Number(byPayment.QRIS.revenue) },
                 TRANSFER: { count: byPayment.TRANSFER.count, revenue: Number(byPayment.TRANSFER.revenue) },
+                BON: { count: byPayment.BON.count, revenue: Number(byPayment.BON.revenue) },
             },
+            // revenue memuat penjualan bon (belum tentu sudah dibayar); cashIn hanya uang yang sudah masuk.
+            debtPaymentsReceived: Number(debtPaymentsReceived),
+            cashIn: Number(cashIn),
+            debtOutstanding: Number(debtOutstanding),
             topProducts,
         }
     }, {

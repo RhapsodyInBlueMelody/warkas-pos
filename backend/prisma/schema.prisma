@@ -30,6 +30,8 @@ model Store {
   products       Product[]
   transactions   Transaction[]
   stockMovements StockMovement[]
+  customers      Customer[]
+  debtEntries    DebtEntry[]
 }
 
 model User {
@@ -121,6 +123,7 @@ enum PaymentMethod {
   QRIS
   CASH
   TRANSFER
+  BON // dibayar nanti; menambah utang pelanggan
 }
 
 model Transaction {
@@ -135,6 +138,11 @@ model Transaction {
 
   kasir   User   @relation(fields: [kasirId], references: [userId])
   kasirId String
+
+  // Terisi hanya untuk transaksi BON.
+  customer   Customer? @relation(fields: [customerId], references: [customerId])
+  customerId String?
+  debtEntry  DebtEntry?
 
   items TransactionItem[]
 
@@ -154,6 +162,53 @@ model TransactionItem {
 
   product   Product @relation(fields: [productId], references: [productId])
   productId String
+}
+
+// Pelanggan yang boleh berutang. Nama boleh kembar (dua "Bu Ani"); bedakan lewat nomor telepon.
+model Customer {
+  customerId String   @id @default(uuid())
+  name       String
+  phone      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  createdBy  String
+
+  store   Store  @relation(fields: [storeId], references: [storeId])
+  storeId String
+
+  transactions Transaction[]
+  entries      DebtEntry[]
+
+  @@index([storeId, name])
+}
+
+enum DebtEntryType {
+  CHARGE  // utang bertambah
+  PAYMENT // utang dibayar (boleh cicilan)
+}
+
+// Buku besar bon: hanya ditambah, tidak diubah. Sisa utang = total CHARGE - total PAYMENT.
+// Di database ada CHECK (amount > 0) yang tidak terlihat oleh Prisma.
+model DebtEntry {
+  debtEntryId String        @id @default(uuid())
+  type        DebtEntryType
+  amount      Decimal
+  note        String?
+  createdAt   DateTime      @default(now())
+  createdBy   String
+
+  store   Store  @relation(fields: [storeId], references: [storeId])
+  storeId String
+
+  customer   Customer @relation(fields: [customerId], references: [customerId])
+  customerId String
+
+  // Terisi bila CHARGE berasal dari checkout BON. Satu transaksi paling banyak satu CHARGE.
+  transaction   Transaction? @relation(fields: [transactionId], references: [transactionId])
+  transactionId String?      @unique
+
+  @@index([storeId, customerId])
+  @@index([storeId, createdAt])
 }
 
 enum Reason {
