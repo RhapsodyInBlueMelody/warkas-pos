@@ -26,6 +26,7 @@ export const transactionRoutes = new Elysia()
             }
 
             const { items, paymentMethod } = body;
+            const { storeId } = user;
 
             const productIds = new Set(items.map(item => item.productId));
             if (productIds.size !== items.length) {
@@ -40,9 +41,11 @@ export const transactionRoutes = new Elysia()
             const transactionCode = `TRX${date}${crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
 
             const result = await prisma.$transaction(async (tx) => {
+                // Hanya produk milik toko ini yang bisa dijual. Produk toko lain
+                // diperlakukan sama seperti produk yang tidak ada.
                 const products = await Promise.all(
-                    items.map(item => tx.product.findUnique({
-                        where: { productId: item.productId },
+                    items.map(item => tx.product.findFirst({
+                        where: { productId: item.productId, storeId },
                         select: {
                             productId: true,
                             name: true,
@@ -76,6 +79,7 @@ export const transactionRoutes = new Elysia()
                     data: {
                         code: transactionCode,
                         totalPrice,
+                        storeId,
                         kasirId: user.userId,
                         paymentMethod,
                     }
@@ -102,6 +106,7 @@ export const transactionRoutes = new Elysia()
                     const stockUpdate = await tx.product.updateMany({
                         where: {
                             productId: product.productId,
+                            storeId,
                             stock: { gte: item.quantity },
                         },
                         data: {
@@ -117,6 +122,7 @@ export const transactionRoutes = new Elysia()
                 return transaction;
             });
 
+            set.status = 201;
             return { message: 'Transaksi Berhasil', transactionCode: result.code };
 
         } catch (error: unknown) {
@@ -149,9 +155,12 @@ export const transactionRoutes = new Elysia()
 
             const history = await prisma.transaction.findMany({
                 where: {
-                    kasirId: user.userId
+                    storeId: user.storeId,
+                    // Pemilik melihat seluruh transaksi tokonya; kasir hanya miliknya sendiri.
+                    ...(user.role === 'ADMIN' ? {} : { kasirId: user.userId }),
                 },
                 include: {
+                    kasir: { select: { name: true } },
                     items: {
                         include: {
                             product: {

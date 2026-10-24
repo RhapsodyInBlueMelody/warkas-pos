@@ -5,9 +5,10 @@ import { authMiddleware } from '../middleware/auth'
 export const profileRoutes = new Elysia()
     .use(authMiddleware)
     .get('/profile', async ({ user, set }) => {
-        const profile = await prisma.user.findUnique({
+        const profile = await prisma.user.findFirst({
             where: {
-                userId: user.userId
+                userId: user.userId,
+                storeId: user.storeId,
             },
             select: {
                 userId: true,
@@ -16,6 +17,7 @@ export const profileRoutes = new Elysia()
                 username: true,
                 role: true,
                 createdAt: true,
+                store: { select: { storeId: true, name: true, plan: true } },
             }
         })
 

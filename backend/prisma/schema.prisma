@@ -7,13 +7,34 @@ datasource db {
 }
 
 enum Role {
-  ADMIN
+  ADMIN // pemilik toko
   KASIR
+}
+
+enum Plan {
+  FREE
+  TOKO
+}
+
+// Satu baris = satu toko/warung. Semua data bisnis menempel ke Store lewat storeId.
+model Store {
+  storeId   String   @id @default(uuid())
+  name      String
+  plan      Plan     @default(FREE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          User[]
+  categories     Category[]
+  suppliers      Supplier[]
+  products       Product[]
+  transactions   Transaction[]
+  stockMovements StockMovement[]
 }
 
 model User {
   userId    String   @id @default(uuid())
-  code      String   @unique
+  code      String
   name      String
   username  String   @unique
   password  String
@@ -23,73 +44,97 @@ model User {
   createdBy String?
   updatedBy String?
 
+  store   Store  @relation(fields: [storeId], references: [storeId])
+  storeId String
+
   transactions Transaction[]
+
+  @@unique([storeId, code])
 }
 
 model Category {
   categoryId String   @id @default(uuid())
-  code       String   @unique
+  code       String
   name       String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   createdBy  String
   updatedBy  String
 
-  products   Product[]
+  store   Store  @relation(fields: [storeId], references: [storeId])
+  storeId String
+
+  products Product[]
+
+  @@unique([storeId, code])
 }
 
 model Supplier {
-    supplierId String @id @default(uuid())
-    code       String @unique
-    name       String
-
-    createdAt  DateTime @default(now())
-    updatedAt  DateTime @updatedAt
-    createdBy  String
-    updatedBy  String
-
-    products Product[]
-}
-
-model Product {
-  productId  String   @id @default(uuid())
-  code       String   @unique
+  supplierId String   @id @default(uuid())
+  code       String
   name       String
-  price      Decimal
-  supplier   Supplier @relation(fields: [supplierId], references: [supplierId])
-  supplierId String
-  stock      Int
-  unit       String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   createdBy  String
   updatedBy  String
 
-  category         Category          @relation(fields: [categoryId], references: [categoryId])
-  categoryId       String
+  store   Store  @relation(fields: [storeId], references: [storeId])
+  storeId String
+
+  products Product[]
+
+  @@unique([storeId, code])
+}
+
+model Product {
+  productId String   @id @default(uuid())
+  code      String
+  name      String
+  price     Decimal
+  stock     Int
+  unit      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String
+  updatedBy String
+
+  store   Store  @relation(fields: [storeId], references: [storeId])
+  storeId String
+
+  supplier   Supplier? @relation(fields: [supplierId], references: [supplierId])
+  supplierId String?
+  category   Category? @relation(fields: [categoryId], references: [categoryId])
+  categoryId String?
 
   transactionItems TransactionItem[]
-  stockMovement StockMovement[]
+  stockMovement    StockMovement[]
+
+  @@unique([storeId, code])
+  @@index([storeId])
 }
 
 enum PaymentMethod {
-    QRIS
-    CASH
-    TRANSFER
+  QRIS
+  CASH
+  TRANSFER
 }
 
 model Transaction {
-  transactionId String   @id @default(uuid())
-  code          String   @unique
+  transactionId String        @id @default(uuid())
+  code          String        @unique
   totalPrice    Decimal
-  createdAt     DateTime @default(now())
-
-  kasir    User              @relation(fields: [kasirId], references: [userId])
-  kasirId  String
-
+  createdAt     DateTime      @default(now())
   paymentMethod PaymentMethod
 
-  items    TransactionItem[]
+  store   Store  @relation(fields: [storeId], references: [storeId])
+  storeId String
+
+  kasir   User   @relation(fields: [kasirId], references: [userId])
+  kasirId String
+
+  items TransactionItem[]
+
+  @@index([storeId, createdAt])
 }
 
 model TransactionItem {
@@ -101,24 +146,27 @@ model TransactionItem {
   transaction   Transaction @relation(fields: [transactionId], references: [transactionId])
   transactionId String
 
-  product       Product @relation(fields: [productId], references: [productId])
-  productId     String
+  product   Product @relation(fields: [productId], references: [productId])
+  productId String
 }
 
 enum Reason {
-    PURCHASE
-    ADJUSTMENT
-    RETURN
+  PURCHASE
+  ADJUSTMENT
+  RETURN
 }
 
 model StockMovement {
-  stockMovementId String  @id @default(uuid())
+  stockMovementId String   @id @default(uuid())
+  code            String   @unique
+  quantity        Int
+  reason          Reason
+  createdAt       DateTime @default(now())
+  createdBy       String
+
+  store   Store  @relation(fields: [storeId], references: [storeId])
+  storeId String
+
   product   Product @relation(fields: [productId], references: [productId])
   productId String
-  code              String  @unique
-  quantity          Int
-  reason        Reason
-
-  createdAt     DateTime  @default(now())
-  createdBy     String
 }
