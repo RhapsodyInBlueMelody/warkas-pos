@@ -44,19 +44,19 @@ async function main() {
     const minuman = await prisma.category.create({ data: { code: 'CAT002', name: 'Minuman', ...audit } })
 
     const productsData = [
-        { code: 'PRD001', name: 'Indomie Goreng', price: 3500, stock: 100, unit: 'PCS', cat: makanan.categoryId },
-        { code: 'PRD002', name: 'Roti Coklat', price: 5000, stock: 50, unit: 'PCS', cat: makanan.categoryId },
-        { code: 'PRD003', name: 'Teh Botol', price: 4500, stock: 75, unit: 'BOTOL', cat: minuman.categoryId },
-        { code: 'PRD004', name: 'Kopi Susu Kaleng', price: 7000, stock: 60, unit: 'CAN', cat: minuman.categoryId },
-        { code: 'PRD005', name: 'Keripik Singkong', price: 6000, stock: 40, unit: 'PACK', cat: makanan.categoryId },
-        { code: 'PRD006', name: 'Air Mineral 600ml', price: 3000, stock: 120, unit: 'BOTOL', cat: minuman.categoryId },
+        { code: 'PRD001', name: 'Indomie Goreng', price: 3500, cost: 2800, stock: 100, unit: 'PCS', cat: makanan.categoryId },
+        { code: 'PRD002', name: 'Roti Coklat', price: 5000, cost: 3600, stock: 50, unit: 'PCS', cat: makanan.categoryId },
+        { code: 'PRD003', name: 'Teh Botol', price: 4500, cost: 3300, stock: 75, unit: 'BOTOL', cat: minuman.categoryId },
+        { code: 'PRD004', name: 'Kopi Susu Kaleng', price: 7000, cost: 5200, stock: 60, unit: 'CAN', cat: minuman.categoryId },
+        { code: 'PRD005', name: 'Keripik Singkong', price: 6000, cost: 4200, stock: 4, unit: 'PACK', cat: makanan.categoryId }, // sengaja menipis
+        { code: 'PRD006', name: 'Air Mineral 600ml', price: 3000, cost: 2000, stock: 120, unit: 'BOTOL', cat: minuman.categoryId },
     ]
 
     const products = []
     for (const p of productsData) {
         products.push(await prisma.product.create({
             data: {
-                code: p.code, name: p.name, price: p.price, stock: p.stock, unit: p.unit,
+                code: p.code, name: p.name, price: p.price, costPrice: p.cost, stock: p.stock, unit: p.unit,
                 categoryId: p.cat, ...audit,
             }
         }))
@@ -70,6 +70,7 @@ async function main() {
                 code: `TRXITEMSEED${day}${n}${i}`,
                 quantity: i + 1,
                 priceAtTime: prod.price,
+                costAtTime: prod.costPrice,
                 productId: prod.productId,
             }))
             const totalPrice = items.reduce(

@@ -50,6 +50,7 @@ export const transactionRoutes = new Elysia()
                             productId: true,
                             name: true,
                             price: true,
+                            costPrice: true,
                             stock: true,
                         }
                     }))
@@ -98,6 +99,7 @@ export const transactionRoutes = new Elysia()
                             code: `TRXITEM${crypto.randomUUID().replace(/-/g, '').toUpperCase()}`,
                             quantity: item.quantity,
                             priceAtTime: product.price,
+                            costAtTime: product.costPrice,
                             transactionId: transaction.transactionId,
                             productId: product.productId,
                         }
@@ -180,9 +182,11 @@ export const transactionRoutes = new Elysia()
             const formattedHistory = history.map(trx => ({
                 ...trx,
                 totalPrice: Number(trx.totalPrice),
-                items: trx.items.map(item => ({
+                items: trx.items.map(({ costAtTime, ...item }) => ({
                     ...item,
-                    priceAtTime: Number(item.priceAtTime)
+                    priceAtTime: Number(item.priceAtTime),
+                    // Modal hanya terlihat oleh pemilik.
+                    ...(user.role === 'ADMIN' ? { costAtTime: costAtTime === null ? null : Number(costAtTime) } : {}),
                 }))
             }));
 

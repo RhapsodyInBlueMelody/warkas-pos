@@ -91,7 +91,11 @@ model Product {
   code      String
   name      String
   price     Decimal
+  // Harga modal. Null = belum diisi; produk tanpa modal tidak ikut hitungan untung.
+  costPrice Decimal?
   stock     Int
+  // Stok dianggap menipis bila stock <= minStock.
+  minStock  Int      @default(5)
   unit      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -142,8 +146,10 @@ model TransactionItem {
   code              String  @unique
   quantity          Int
   priceAtTime       Decimal
+  // Salinan harga modal saat transaksi, supaya laporan lama tidak berubah bila modal diedit.
+  costAtTime        Decimal?
 
-  transaction   Transaction @relation(fields: [transactionId], references: [transactionId])
+  transaction  Transaction @relation(fields: [transactionId], references: [transactionId])
   transactionId String
 
   product   Product @relation(fields: [productId], references: [productId])
