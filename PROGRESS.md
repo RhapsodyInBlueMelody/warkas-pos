@@ -11,7 +11,7 @@ Warkas adalah kasir digital multi-toko untuk warung dan toko kecil. Basis kodeny
 - [x] M2 Harga modal, laporan untung harian, penanda stok menipis (18 tes lulus)
 - [x] M3 Buku bon (utang pelanggan) (29 tes lulus)
 - [x] M4 Paket gratis/Toko: trial 14 hari, kedaluwarsa, batas 50 produk, kunci bon, `GET /plan`, aktivasi manual (M4a); laporan mingguan/bulanan (M4b); ekspor Excel (M4c). Tidak ada pembayaran otomatis. 54 tes lulus
-- [ ] M5 Aplikasi mobile: rebrand ke Warkas, layar daftar toko, bon, laporan
+- [ ] M5 Aplikasi mobile. Selesai: M5a (tema Warkas, API client, sesi, login, daftar toko, dashboard). Belum: M5b kasir + riwayat + struk, M5c bon, produk, laporan, paket/upgrade, ekspor
 - [ ] M6 Samakan proposal dan landing page dengan fitur yang benar-benar jadi
 
 ## Keputusan
@@ -22,7 +22,7 @@ Warkas adalah kasir digital multi-toko untuk warung dan toko kecil. Basis kodeny
 
 ## Catatan jujur
 
-- Aplikasi mobile tidak bisa dijalankan di lingkungan pengembangan Claude. Layar mobile ditulis tanpa dijalankan; uji di emulator atau HP.
+- Aplikasi mobile tidak bisa dijalankan sebagai app Android di lingkungan pengembangan Claude. Yang bisa: typecheck (`npx tsc --noEmit`) dan pratinjau web (`npx expo export --platform web`, dibuka di Chromium terhadap backend sungguhan). Uji di emulator atau HP tetap perlu.
 - Kode asal dikerjakan untuk KOSAI TB 1. Pastikan boleh dipakai ulang sebelum repo ini dipublikasikan atau dipakai komersial.
 
 ## Menjalankan backend dan tes
@@ -88,3 +88,13 @@ bun prisma/seed.ts     # data demo: username demo / demo.kasir, password demo123
 - Waktu ditulis sebagai jam lokal sesuai `tzOffset`. Semua string ditulis sebagai teks, jadi isi yang diawali "=" tidak menjadi rumus.
 - Tes diverifikasi dengan mutasi: gate paket dan offset zona waktu dimatikan, tes gagal.
 - Belum diuji dibuka di Excel/LibreOffice sungguhan; hanya dibaca ulang dengan exceljs.
+
+## Catatan M5a (mobile: fondasi)
+
+- Layar KOSAI lama (Dashboard, Product, History, TransactionSuccess, Login) dihapus; kasir dan riwayat ditulis ulang di M5b. Sampai M5b selesai, app mobile hanya bisa daftar toko, masuk, dan melihat dashboard.
+- Tema di `theme.ts` (palet dan font sama dengan landing page), komponen dasar di `ui.tsx`. `react-native-paper`, vector-icons, blur, gradient, Inter, Poppins dibuang.
+- Alamat backend lewat `EXPO_PUBLIC_API_URL` (bawaan `http://10.0.2.2:3000` untuk emulator Android; HP asli pakai IP komputer).
+- Sesi disimpan di `expo-secure-store` (terenkripsi). Aturan sesi 3 menit milik KOSAI dibuang; sesi berakhir saat server membalas 401 (token berlaku 24 jam), lalu navigator kembali ke layar masuk otomatis dan cache data dihapus.
+- Batas hari laporan memakai zona waktu perangkat (`tzOffset`).
+- Diverifikasi: typecheck bersih; pratinjau web di Chromium terhadap backend + data demo (login salah/kosong, daftar, dashboard pemilik). Belum: Android asli, dashboard kasir, toko paket gratis.
+- Kunci SecureStore tidak jalan di web, jadi di pratinjau web sesi hilang saat reload (di Android tersimpan).

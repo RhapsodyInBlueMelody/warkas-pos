@@ -1,129 +1,142 @@
-import React from 'react';
-import { FlatList, View, StyleSheet, useWindowDimensions, Text } from 'react-native';
-import { Surface, Avatar, TouchableRipple } from 'react-native-paper';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as React from 'react'
+import { RefreshControl, ScrollView, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { useQuery } from '@tanstack/react-query'
+import { colors, radius, space } from '../theme'
+import { Badge, Button, Card, ErrorState, Loading, Money, Row, Text, formatDay } from '../ui'
+import { getDailyReport, getPlan, getProducts, logout, type PlanInfo } from '../services/api'
+import { getSession } from '../services/session'
 
-const MENU_ITEMS = [
-    { id: 'products', title: 'Products', icon: 'package-variant-closed', color: '#1a472a', route: 'Product' },
-    { id: 'transaction', title: 'History Transaksi', icon: 'package-variant-closed', color: '#1a472a', route: 'HistoryTransaction' },
-];
-
-const OUTER_PADDING = 16;
-const GAP_SIZE = 12;
-
-export default function DashboardScreen({ navigation }: any) {
-    const { width } = useWindowDimensions();
-    const [displayUser, setDisplayUser] = React.useState('Kasir');
-
-    // Read the display name value on screen initialization mount
-    React.useEffect(() => {
-        const loadUserDisplayDetails = async () => {
-            try {
-                const storedName = await AsyncStorage.getItem('DisplayName');
-                if (storedName) {
-                    setDisplayUser(storedName); // Will set to "Kasir Utama" or "Administrator"
-                }
-            } catch (e) {
-                console.error("Failed to read user data records", e);
-            }
-        };
-        loadUserDisplayDetails();
-    }, []);
-
-    const cardWidth = (width - (OUTER_PADDING * 2) - GAP_SIZE) / 2;
-
-    const renderGridItem = ({ item }: any) => (
-        <Surface style={[styles.cardSurface, { width: cardWidth }]} elevation={1}>
-            <TouchableRipple
-                onPress={() => navigation.navigate(item.route)}
-                rippleColor="rgba(26, 71, 42, 0.22)"
-                style={styles.rippleContainer}
-            >
-                <View style={styles.cardInnerContent}>
-                    <Avatar.Icon
-                        size={52}
-                        icon={item.icon}
-                        backgroundColor="#eef7f2"
-                        color={item.color}
-                    />
-                    <Text style={styles.cardTitle}>
-                        {item.title}
-                    </Text>
-                </View>
-            </TouchableRipple>
-        </Surface>
-    );
-
+function PlanCard({ plan }: { plan: PlanInfo }) {
+    const limit = plan.limits.maxProducts
+    if (plan.plan === 'TOKO') {
+        const soon = plan.daysLeft !== null && plan.daysLeft <= 3
+        return (
+            <Card style={{ borderColor: soon ? colors.price : colors.line }}>
+                <Row style={{ justifyContent: 'space-between' }}>
+                    <Text weight="semibold">{plan.isTrial ? 'Trial paket Toko' : 'Paket Toko'}</Text>
+                    <Badge label={plan.isTrial ? 'TRIAL' : 'AKTIF'} tone={plan.isTrial ? 'accent' : 'ok'} />
+                </Row>
+                <Text size={13} color={colors.inkSoft} style={{ marginTop: 4 }}>
+                    {plan.daysLeft === null
+                        ? 'Tanpa batas waktu.'
+                        : plan.daysLeft === 0
+                            ? 'Berakhir hari ini.'
+                            : `Sisa ${plan.daysLeft} hari.`}
+                    {plan.isTrial ? ' Setelah itu toko pindah ke paket Warung (gratis).' : ''}
+                </Text>
+            </Card>
+        )
+    }
+    const near = limit !== null && plan.usage.products >= limit * 0.8
     return (
-        <View style={styles.container}>
-            <View style={styles.header}>
-                {/* Dynamically displays the user's friendly name string */}
-                <Text style={styles.welcomeText}>Selamat Datang, {displayUser}! 👋</Text>
-                <Text style={styles.subText}>Kelola operasional tokomu di bawah ini.</Text>
-            </View>
-
-            <FlatList
-                data={MENU_ITEMS}
-                renderItem={renderGridItem}
-                keyExtractor={item => item.id}
-                numColumns={2}
-                columnWrapperStyle={styles.row}
-                contentContainerStyle={styles.listPadding}
-            />
-        </View>
-    );
+        <Card style={{ borderColor: near ? colors.price : colors.line }}>
+            <Row style={{ justifyContent: 'space-between' }}>
+                <Text weight="semibold">Paket Warung</Text>
+                <Badge label="GRATIS" tone="neutral" />
+            </Row>
+            <Text size={13} color={colors.inkSoft} style={{ marginTop: 4 }}>
+                {plan.usage.products} dari {limit} produk terpakai. Buku bon, laporan mingguan/bulanan, dan ekspor Excel ada di paket Toko (Rp39.000/bulan).
+            </Text>
+        </Card>
+    )
 }
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#f4f7f5',
-    },
-    header: {
-        paddingHorizontal: OUTER_PADDING,
-        paddingTop: 24,
-        paddingBottom: 16,
-    },
-    welcomeText: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#1a472a',
-    },
-    subText: {
-        fontSize: 14,
-        color: '#6c7d72',
-        marginTop: 4,
-    },
-    listPadding: {
-        paddingHorizontal: OUTER_PADDING,
-        paddingBottom: 24,
-    },
-    row: {
-        flexDirection: 'row',
-        justifyContent: 'flex-start',
-        gap: GAP_SIZE,
-        marginBottom: GAP_SIZE,
-    },
-    cardSurface: {
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
-        overflow: 'hidden',
-    },
-    rippleContainer: {
-        width: '100%',
-    },
-    cardInnerContent: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 28,
-        paddingHorizontal: 12,
-        backgroundColor: '#ffffff',
-    },
-    cardTitle: {
-        marginTop: 14,
-        fontSize: 15,
-        fontWeight: 'bold',
-        color: '#122315',
-        textAlign: 'center',
-    },
-});
+function Stat({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <View style={{ flex: 1, minWidth: '45%', paddingVertical: space.sm }}>
+            <Text size={12} color={colors.inkSoft}>{label}</Text>
+            <View style={{ marginTop: 2 }}>{children}</View>
+        </View>
+    )
+}
+
+export default function DashboardScreen() {
+    const session = getSession()
+    const isOwner = session?.user.role === 'ADMIN'
+
+    const plan = useQuery({ queryKey: ['plan'], queryFn: getPlan })
+    const today = useQuery({ queryKey: ['report', 'daily'], queryFn: () => getDailyReport(), enabled: isOwner })
+    const products = useQuery({ queryKey: ['products'], queryFn: getProducts })
+
+    const [refreshing, setRefreshing] = React.useState(false)
+    const refresh = async () => {
+        setRefreshing(true)
+        await Promise.all([plan.refetch(), products.refetch(), isOwner ? today.refetch() : null])
+        setRefreshing(false)
+    }
+
+    if (plan.isLoading) return <Loading />
+    if (plan.isError || !plan.data) {
+        return <ErrorState message={(plan.error as Error)?.message ?? 'Gagal memuat data.'} onRetry={() => plan.refetch()} />
+    }
+
+    const low = (products.data ?? []).filter(p => p.lowStock)
+    const r = today.data
+
+    return (
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+            <ScrollView
+                contentContainerStyle={{ padding: space.lg, gap: space.md }}
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} />}
+            >
+                <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <View style={{ flex: 1, paddingRight: space.md }}>
+                        <Text weight="bold" size={28} style={{ letterSpacing: -0.5 }}>{session?.store.name}</Text>
+                        <Text size={14} color={colors.inkSoft}>
+                            {session?.user.name} · {isOwner ? 'Pemilik' : 'Kasir'}
+                        </Text>
+                    </View>
+                    <Button label="Keluar" variant="ghost" onPress={() => { void logout() }} style={{ minHeight: 40, paddingHorizontal: space.md }} />
+                </Row>
+
+                <PlanCard plan={plan.data} />
+
+                {isOwner ? (
+                    <Card>
+                        <Text weight="semibold">Hari ini{r ? ` · ${formatDay(r.date)}` : ''}</Text>
+                        {today.isLoading ? (
+                            <Text size={13} color={colors.inkSoft} style={{ marginTop: space.sm }}>Memuat…</Text>
+                        ) : today.isError || !r ? (
+                            <Text size={13} color={colors.danger} style={{ marginTop: space.sm }}>Laporan gagal dimuat. Tarik layar ke bawah untuk mencoba lagi.</Text>
+                        ) : (
+                            <>
+                                <Row style={{ flexWrap: 'wrap', marginTop: space.xs }}>
+                                    <Stat label="Omzet"><Money value={r.revenue} size={18} weight="bold" /></Stat>
+                                    <Stat label="Uang masuk"><Money value={r.cashIn} size={18} /></Stat>
+                                    <Stat label="Untung"><Money value={r.profit} size={18} color={colors.ok} /></Stat>
+                                    <Stat label="Transaksi"><Text mono size={18}>{r.transactionCount}</Text></Stat>
+                                </Row>
+                                {!r.profitComplete ? (
+                                    <Text size={12} color={colors.warn} style={{ marginTop: space.xs }}>
+                                        Untung belum lengkap: {r.uncostedItemCount} item terjual tanpa harga modal.
+                                    </Text>
+                                ) : null}
+                                {r.debtOutstanding > 0 ? (
+                                    <Text size={13} color={colors.inkSoft} style={{ marginTop: space.sm }}>
+                                        Sisa bon pelanggan: <Money value={r.debtOutstanding} size={13} />
+                                    </Text>
+                                ) : null}
+                            </>
+                        )}
+                    </Card>
+                ) : null}
+
+                {low.length > 0 ? (
+                    <Card style={{ backgroundColor: colors.warnSoft, borderColor: colors.price }}>
+                        <Text weight="semibold">{low.length} produk stoknya menipis</Text>
+                        {low.slice(0, 4).map(p => (
+                            <Row key={p.productId} style={{ justifyContent: 'space-between', marginTop: space.xs }}>
+                                <Text size={14} style={{ flex: 1 }} numberOfLines={1}>{p.name}</Text>
+                                <Text mono size={14} color={colors.warn}>sisa {p.stock} {p.unit}</Text>
+                            </Row>
+                        ))}
+                        {low.length > 4 ? <Text size={12} color={colors.inkSoft} style={{ marginTop: space.xs }}>dan {low.length - 4} lainnya</Text> : null}
+                    </Card>
+                ) : null}
+
+                <View style={{ height: radius.lg }} />
+            </ScrollView>
+        </SafeAreaView>
+    )
+}

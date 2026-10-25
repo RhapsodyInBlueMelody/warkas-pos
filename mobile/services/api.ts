@@ -1,98 +1,248 @@
 import { API_URL } from '../constants/api'
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearSession, getSession, saveSession, type Role, type Session } from './session'
 
-export const LoginProcess = async (username: string, password: string) => {
-    try {
-        const response = await fetch(`${API_URL}/login`, {
-            method: 'POST',
-            headers: {
-                Accept: 'application/json',
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ username, password })
-        })
+// ---------- error ----------
 
-        const json = await response.json();
+export class ApiError extends Error {
+    status: number
+    code?: string
+    feature?: string
+    body: any
 
-        if (json.token) {
-            await AsyncStorage.setItem('Token', json.token);
+    constructor(status: number, message: string, body?: any) {
+        super(message)
+        this.status = status
+        this.body = body
+        this.code = body?.code
+        this.feature = body?.feature
+    }
 
-            // Tambahkan baris ini untuk mencatat waktu kasir berhasil login (murni angka Epoch milidetik)
-            await AsyncStorage.setItem('LoginTimestamp', Date.now().toString());
-
-            if (json.user && json.user.name) {
-                await AsyncStorage.setItem('DisplayName', json.user.name);
-            }
-        }
-
-        return json;
-    } catch (e) {
-        console.error('Error:', e);
+    /** 402: fitur atau batas milik paket Toko. UI menampilkan ajakan upgrade, bukan pesan error biasa. */
+    get needsUpgrade() {
+        return this.status === 402
     }
 }
 
-export const GetAllProduct = async () => {
-    try {
-        const token = await AsyncStorage.getItem('Token')
-        const response = await fetch(`${API_URL}/products`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                Accept: 'application/json',
-            },
-        })
+// ---------- tipe respons ----------
 
-        const json = await response.json();
-        return json
-    } catch (e) {
-        console.error('Error:', e)
-    }
+export type PlanName = 'FREE' | 'TOKO'
+
+export type PlanInfo = {
+    plan: PlanName
+    storedPlan: PlanName
+    isTrial: boolean
+    expiresAt: string | null
+    daysLeft: number | null
+    limits: { maxProducts: number | null }
+    usage: { products: number }
+    features: { bon: boolean; extendedReports: boolean; export: boolean }
 }
 
-export const CreateTransaction = async (payload: { items: any[]; paymentMethod: string }) => {
-    try {
-        const token = await AsyncStorage.getItem('Token');
-
-        if (!token) {
-            throw new Error("Sesi login Anda tidak ditemukan. Silakan login ulang.");
-        }
-
-        const response = await fetch(`${API_URL}/transaction`, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Accept': 'application/json',
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || "Terjadi kesalahan pada server.");
-        }
-
-        return await response.json();
-    } catch (e: any) {
-        throw e;
-    }
-};
-
-export const GetTransactionHistory = async () => {
-    try {
-        const token = await AsyncStorage.getItem('Token')
-        const response = await fetch(`${API_URL}/transactions`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                Accept: 'application/json',
-            },
-        })
-
-        const json = await response.json();
-        return json
-    } catch (e) {
-        console.error('Error:', e)
-    }
+export type Product = {
+    productId: string
+    code: string
+    name: string
+    unit: string
+    price: string | number
+    costPrice?: string | number | null // hanya dikirim untuk pemilik
+    stock: number
+    minStock: number
+    lowStock: boolean
+    categoryId: string | null
 }
 
+export type PaymentMethod = 'CASH' | 'QRIS' | 'TRANSFER' | 'BON'
+
+export type Customer = { customerId: string; name: string; phone: string | null; balance: number }
+
+export type DebtEntry = {
+    debtEntryId: string
+    type: 'CHARGE' | 'PAYMENT'
+    amount: number
+    note: string | null
+    createdAt: string
+    transaction: { code: string } | null
+}
+
+export type TransactionRecord = {
+    transactionId: string
+    code: string
+    totalPrice: number
+    paymentMethod: PaymentMethod
+    createdAt: string
+    kasir: { name: string }
+    customer: { customerId: string; name: string } | null
+    items: Array<{
+        quantity: number
+        priceAtTime: number
+        costAtTime?: number | null
+        product: { name: string; code: string }
+    }>
+}
+
+export type ReportSummary = {
+    transactionCount: number
+    revenue: number
+    cost: number
+    profit: number
+    profitComplete: boolean
+    uncostedItemCount: number
+    uncostedRevenue: number
+    byPayment: Record<PaymentMethod, { count: number; revenue: number }>
+    debtPaymentsReceived: number
+    cashIn: number
+    topProducts: Array<{ productId: string; name: string; quantity: number; revenue: number }>
+    debtOutstanding: number
+}
+
+export type DailyReport = ReportSummary & { date: string; tzOffset: number }
+
+export type PeriodReport = ReportSummary & {
+    period: 'week' | 'month'
+    from: string
+    to: string
+    days: Array<{
+        date: string
+        transactionCount: number
+        revenue: number
+        cost: number
+        profit: number
+        profitComplete: boolean
+        cashIn: number
+    }>
+}
+
+// ---------- inti ----------
+
+type Options = { body?: unknown; query?: Record<string, string | number | undefined>; auth?: boolean }
+
+function buildUrl(path: string, query?: Options['query']) {
+    const params = Object.entries(query ?? {})
+        .filter(([, v]) => v !== undefined && v !== '')
+        .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+    return `${API_URL}${path}${params.length ? `?${params.join('&')}` : ''}`
+}
+
+function messageFrom(status: number, body: any): string {
+    if (typeof body?.detail === 'string') return body.detail
+    if (typeof body?.message === 'string') return body.message
+    if (status === 422) return 'Data yang dikirim tidak valid.'
+    if (status >= 500) return 'Server sedang bermasalah. Coba lagi sebentar lagi.'
+    return 'Permintaan gagal.'
+}
+
+export async function request<T>(method: string, path: string, opts: Options = {}): Promise<T> {
+    const auth = opts.auth ?? true
+    const token = getSession()?.token
+    if (auth && !token) throw new ApiError(401, 'Sesi login tidak ditemukan. Silakan masuk lagi.')
+
+    let res: Response
+    try {
+        res = await fetch(buildUrl(path, opts.query), {
+            method,
+            headers: {
+                Accept: 'application/json',
+                ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+                ...(auth ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+        })
+    } catch {
+        throw new ApiError(0, 'Tidak bisa terhubung ke server. Periksa koneksi internet.')
+    }
+
+    const text = await res.text()
+    let body: any = null
+    try { body = text ? JSON.parse(text) : null } catch { /* bukan JSON */ }
+
+    if (!res.ok) {
+        // Token kedaluwarsa atau dicabut: kembali ke layar masuk. Login yang salah (auth=false) tidak menyentuh sesi.
+        if (res.status === 401 && auth) await clearSession()
+        throw new ApiError(res.status, messageFrom(res.status, body), body)
+    }
+    return body as T
+}
+
+// ---------- auth ----------
+
+type AuthResponse = { token: string; user: { name: string; role: Role; username: string }; store: { storeId: string; name: string } }
+
+async function startSession(res: AuthResponse) {
+    const session: Session = { token: res.token, user: res.user, store: { storeId: res.store.storeId, name: res.store.name } }
+    await saveSession(session)
+    return session
+}
+
+export async function login(username: string, password: string) {
+    const res = await request<AuthResponse>('POST', '/login', { auth: false, body: { username: username.trim(), password } })
+    return startSession(res)
+}
+
+export async function registerStore(input: { storeName: string; name: string; username: string; password: string }) {
+    const res = await request<AuthResponse>('POST', '/register', {
+        auth: false,
+        body: { ...input, storeName: input.storeName.trim(), name: input.name.trim(), username: input.username.trim() },
+    })
+    return startSession(res)
+}
+
+export const logout = () => clearSession()
+
+// ---------- data ----------
+
+export const getPlan = () => request<PlanInfo>('GET', '/plan')
+
+export const getProducts = async () => (await request<{ products: Product[] }>('GET', '/products')).products
+
+export type ProductInput = {
+    name: string
+    unit: string
+    price: number
+    costPrice?: number
+    stock: number
+    minStock?: number
+    code?: string
+}
+
+export const createProduct = (input: ProductInput) => request<{ product: Product }>('POST', '/products', { body: input })
+
+export const updateProduct = (productId: string, input: Partial<ProductInput>) =>
+    request<{ product: Product }>('PATCH', `/product/${productId}`, { body: input })
+
+export const createTransaction = (input: {
+    items: Array<{ productId: string; quantity: number }>
+    paymentMethod: PaymentMethod
+    customerId?: string
+}) => request<{ message: string; transactionCode: string }>('POST', '/transaction', { body: input })
+
+export const getTransactions = async () =>
+    (await request<{ data: TransactionRecord[] }>('GET', '/transactions')).data
+
+export const getCustomers = (opts: { search?: string; withDebt?: boolean } = {}) =>
+    request<{ customers: Customer[]; totalOutstanding: number }>('GET', '/customers', {
+        query: { search: opts.search, withDebt: opts.withDebt ? 'true' : undefined },
+    })
+
+export const createCustomer = (input: { name: string; phone?: string }) =>
+    request<{ customer: Customer }>('POST', '/customers', { body: input })
+
+export const getCustomer = (customerId: string) =>
+    request<{
+        customer: { customerId: string; name: string; phone: string | null; createdAt: string }
+        balance: number
+        entries: DebtEntry[]
+    }>('GET', `/customers/${customerId}`)
+
+export const payDebt = (customerId: string, amount: number, note?: string) =>
+    request<{ balance: number; settled: boolean }>('POST', `/customers/${customerId}/payments`, {
+        body: { amount, ...(note ? { note } : {}) },
+    })
+
+// Batas hari laporan mengikuti zona waktu perangkat (WIB/WITA/WIT), bukan tebakan server.
+export const tzOffsetMinutes = () => -new Date().getTimezoneOffset()
+
+export const getDailyReport = (date?: string) =>
+    request<DailyReport>('GET', '/reports/daily', { query: { date, tzOffset: tzOffsetMinutes() } })
+
+export const getPeriodReport = (period: 'week' | 'month', date?: string) =>
+    request<PeriodReport>('GET', '/reports/summary', { query: { period, date, tzOffset: tzOffsetMinutes() } })
