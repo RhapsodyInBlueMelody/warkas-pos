@@ -60,6 +60,9 @@ const MENU: MenuItem[] = [
     { label: 'Riwayat', hint: 'Transaksi dan struk', route: 'Riwayat' },
     { label: 'Produk', hint: 'Stok dan harga', route: 'Produk' },
     { label: 'Buku bon', hint: 'Utang pelanggan', route: 'Bon' },
+    { label: 'Laporan', hint: 'Omzet dan untung', route: 'Laporan', ownerOnly: true },
+    { label: 'Paket', hint: 'Fitur dan upgrade', route: 'Paket', ownerOnly: true },
+    { label: 'Staf', hint: 'Akun kasir', route: 'Staf', ownerOnly: true },
 ]
 
 export default function DashboardScreen({ navigation }: NativeStackScreenProps<RootParams, 'Dashboard'>) {
@@ -101,7 +104,7 @@ export default function DashboardScreen({ navigation }: NativeStackScreenProps<R
                     <Button label="Keluar" variant="ghost" onPress={() => { void logout() }} style={{ minHeight: 40, paddingHorizontal: space.md }} />
                 </Row>
 
-                <PlanCard plan={plan.data} />
+                {isOwner ? <PlanCard plan={plan.data} /> : null}
 
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
                     {MENU.filter(m => isOwner || !m.ownerOnly).map(m => (

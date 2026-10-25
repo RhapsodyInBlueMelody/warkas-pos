@@ -11,7 +11,7 @@ Warkas adalah kasir digital multi-toko untuk warung dan toko kecil. Basis kodeny
 - [x] M2 Harga modal, laporan untung harian, penanda stok menipis (18 tes lulus)
 - [x] M3 Buku bon (utang pelanggan) (29 tes lulus)
 - [x] M4 Paket gratis/Toko: trial 14 hari, kedaluwarsa, batas 50 produk, kunci bon, `GET /plan`, aktivasi manual (M4a); laporan mingguan/bulanan (M4b); ekspor Excel (M4c). Tidak ada pembayaran otomatis. 54 tes lulus
-- [ ] M5 Aplikasi mobile. Selesai: M5a (tema, API client, sesi, login, daftar toko, dashboard), M5b (kasir, riwayat, struk), M5c-1 (produk, buku bon). Belum: laporan, layar paket/upgrade, ekspor Excel, staf
+- [x] M5 Aplikasi mobile Warkas: tema, daftar toko/masuk, dashboard, kasir + struk + riwayat, produk, buku bon, laporan harian/mingguan/bulanan, ekspor Excel, paket, staf kasir. Diuji di pratinjau web terhadap backend asli; BELUM diuji di Android asli
 - [ ] M6 Samakan proposal dan landing page dengan fitur yang benar-benar jadi
 
 ## Keputusan
@@ -112,3 +112,12 @@ bun prisma/seed.ts     # data demo: username demo / demo.kasir, password demo123
 - Produk: daftar + cari + filter stok menipis; pemilik bisa tambah/ubah (harga modal, batas stok menipis); kasir hanya melihat dan tidak melihat modal. Batas 50 produk paket gratis ditampilkan dan 402 `PLAN_LIMIT` memunculkan ajakan upgrade. Harga modal yang sudah diisi tidak bisa dikosongkan lagi (server tidak mendukung).
 - Buku bon: total utang, daftar pelanggan, detail dengan riwayat utang/bayar, catat pembayaran (tombol Lunasi, melebihi utang ditolak di UI dan server), pemilik bisa menambah utang manual. Di paket gratis, melihat dan membayar bon lama tetap bisa; pelanggan baru memunculkan ajakan upgrade.
 - Diverifikasi di pratinjau web terhadap backend asli (hasil dicocokkan ke database lewat API). Belum: Android asli, tampilan peran KASIR untuk layar ini, hapus produk (belum ada di UI).
+
+## Catatan M5c-2 (mobile: laporan, paket, staf, ekspor)
+
+- Laporan (pemilik): Hari/Minggu/Bulan, navigasi periode, omzet/uang masuk/untung/transaksi, grafik batang per hari, rincian metode bayar, produk terlaris, sisa bon. Paket gratis: Minggu/Bulan dan ekspor menampilkan ajakan upgrade; harian tetap bisa. Untung yang tidak lengkap diberi peringatan, tidak disembunyikan.
+- Ekspor Excel: unduh dari server lalu `expo-file-system` + `expo-sharing` (Android/iOS). Jalur native ini TIDAK bisa dijalankan di sini; di pratinjau web berkas diunduh langsung dan isinya dicocokkan dengan API (omzet dan jumlah transaksi sama).
+- Paket: status, sisa trial, tabel fitur Warung vs Toko, ajakan upgrade manual.
+- Staf: pemilik membuat akun kasir. Tampilan kasir diperiksa: tidak ada kartu paket, laporan, staf, tombol tambah produk, ataupun info modal.
+- Pratinjau web memakai proxy satu-origin karena backend belum mengaktifkan CORS (tidak perlu untuk app native). Jika nanti ada klien web, tambahkan CORS.
+- Belum ada: hapus produk di UI, kelola kategori/pemasok di UI, ubah/nonaktifkan akun kasir, batas utang pelanggan, pengingat bon, pembayaran otomatis, cetak thermal Bluetooth.

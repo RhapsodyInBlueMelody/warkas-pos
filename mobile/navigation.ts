@@ -11,5 +11,8 @@ export type RootParams = {
     ProdukForm: { product?: Product }
     Bon: undefined
     Pelanggan: { customerId: string; name: string }
+    Laporan: undefined
+    Paket: undefined
+    Staf: undefined
     Struk: { receipt: ReceiptData; fromCheckout?: boolean }
 }

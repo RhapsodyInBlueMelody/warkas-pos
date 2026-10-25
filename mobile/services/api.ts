@@ -251,3 +251,35 @@ export const getDailyReport = (date?: string) =>
 
 export const getPeriodReport = (period: 'week' | 'month', date?: string) =>
     request<PeriodReport>('GET', '/reports/summary', { query: { period, date, tzOffset: tzOffsetMinutes() } })
+
+// ---------- ekspor dan staf ----------
+
+/** Unduh ekspor Excel (paket Toko, pemilik). Mengembalikan isi berkas mentah. */
+export async function downloadExport(from: string, to: string): Promise<{ bytes: Uint8Array; filename: string }> {
+    const token = getSession()?.token
+    if (!token) throw new ApiError(401, 'Sesi login tidak ditemukan. Silakan masuk lagi.')
+
+    let res: Response
+    try {
+        res = await fetch(buildUrl('/export/xlsx', { from, to, tzOffset: tzOffsetMinutes() }), {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+    } catch {
+        throw new ApiError(0, 'Tidak bisa terhubung ke server. Periksa koneksi internet.')
+    }
+
+    if (!res.ok) {
+        let body: any = null
+        try { body = await res.json() } catch { /* bukan JSON */ }
+        if (res.status === 401) await clearSession()
+        throw new ApiError(res.status, messageFrom(res.status, body), body)
+    }
+    return { bytes: new Uint8Array(await res.arrayBuffer()), filename: `warkas-${from}_${to}.xlsx` }
+}
+
+export type StaffMember = { userId: string; code: string; name: string; username: string; role: Role; createdAt: string }
+
+export const getStaff = async () => (await request<{ staff: StaffMember[] }>('GET', '/staff')).staff
+
+export const createStaff = (input: { name: string; username: string; password: string }) =>
+    request<{ staff: StaffMember }>('POST', '/staff', { body: { ...input, name: input.name.trim(), username: input.username.trim() } })
