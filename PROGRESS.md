@@ -10,7 +10,7 @@ Warkas adalah kasir digital multi-toko untuk warung dan toko kecil. Basis kodeny
 - [x] M1 Multi-tenant: `Store`, `storeId` di semua tabel, kode unik per toko, JWT membawa `storeId`, `POST /register`, isolasi data + tes lintas toko (12 tes lulus di Postgres 16 lokal)
 - [x] M2 Harga modal, laporan untung harian, penanda stok menipis (18 tes lulus)
 - [x] M3 Buku bon (utang pelanggan) (29 tes lulus)
-- [ ] M4 Paket gratis/Toko. Selesai: M4a (trial 14 hari, kedaluwarsa, batas 50 produk, kunci bon, `GET /plan`, aktivasi manual). M4b laporan mingguan/bulanan. Belum: M4c ekspor Excel. Tidak ada pembayaran otomatis
+- [x] M4 Paket gratis/Toko: trial 14 hari, kedaluwarsa, batas 50 produk, kunci bon, `GET /plan`, aktivasi manual (M4a); laporan mingguan/bulanan (M4b); ekspor Excel (M4c). Tidak ada pembayaran otomatis. 54 tes lulus
 - [ ] M5 Aplikasi mobile: rebrand ke Warkas, layar daftar toko, bon, laporan
 - [ ] M6 Samakan proposal dan landing page dengan fitur yang benar-benar jadi
 
@@ -52,7 +52,6 @@ bun prisma/seed.ts     # data demo: username demo / demo.kasir, password demo123
 - Untung hanya dihitung dari item yang punya modal. Bila ada item tanpa modal, `profitComplete=false` dan `uncostedRevenue` memberi tahu berapa omzet yang tidak ikut hitungan untung. Jangan tampilkan angka untung sebagai lengkap di UI saat `profitComplete=false`.
 - `GET /products/low-stock` dan field `lowStock` di `GET /products` (stok <= minStock).
 - Kasir tidak menerima `costPrice` maupun `costAtTime`, dan mendapat 403 di laporan.
-- Laporan mingguan/bulanan belum ada (landing page menjanjikannya untuk paket Toko); dikerjakan bersama M4.
 - Seed: produk "Keripik Singkong" sengaja menipis; transaksi demo berumur 1-5 hari (laporan `?date=` kemarin berisi); satu transaksi BON hari ini untuk Bu Ani.
 
 ## Catatan M3
@@ -81,3 +80,11 @@ bun prisma/seed.ts     # data demo: username demo / demo.kasir, password demo123
 - Isi: semua kolom laporan harian + `from`/`to` (tanggal lokal, inklusif) + `days[]` (transaksi, omzet, modal, untung, uang masuk per hari, termasuk hari kosong). Transaksi dikelompokkan per hari kalender lokal sehingga yang jatuh tepat tengah malam masuk hari yang benar.
 - `report.ts` direfaktor: harian dan ringkasan memakai fungsi `loadRange` dan `summarize` yang sama.
 - Tes memakai transaksi yang waktunya dimundurkan ke tanggal tetap (2026-10-19 s.d. 2026-11-01), jadi tidak bergantung pada jam berjalan. Mutasi manual terverifikasi: awal minggu salah, bucket hari UTC, dan akhir bulan salah, semuanya membuat tes gagal.
+
+## Catatan M4c (ekspor Excel)
+
+- `GET /export/xlsx?from=YYYY-MM-DD&to=YYYY-MM-DD&tzOffset` hanya untuk pemilik (403 kasir) dan paket Toko (402 `PLAN_REQUIRED`, feature `export`). Default: awal bulan sampai hari ini (WIB). Maks 366 hari dan 20.000 transaksi, selebihnya 400.
+- Sheet: Ringkasan, Transaksi, Item terjual (modal dan untung kosong bila modal tidak diketahui), Stok (menandai stok menipis), Bon (sisa utang saat ini).
+- Waktu ditulis sebagai jam lokal sesuai `tzOffset`. Semua string ditulis sebagai teks, jadi isi yang diawali "=" tidak menjadi rumus.
+- Tes diverifikasi dengan mutasi: gate paket dan offset zona waktu dimatikan, tes gagal.
+- Belum diuji dibuka di Excel/LibreOffice sungguhan; hanya dibaca ulang dengan exceljs.

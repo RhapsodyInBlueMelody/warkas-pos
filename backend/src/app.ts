@@ -8,6 +8,7 @@ import { transactionRoutes } from './routes/transaction'
 import { reportRoutes } from './routes/report'
 import { customerRoutes } from './routes/customer'
 import { planRoutes } from './routes/plan'
+import { exportRoutes } from './routes/export'
 
 // Urutan penting: route publik (/, /register, /login) harus didaftarkan SEBELUM
 // route yang memakai authMiddleware, karena hook auth berlaku global setelah dipasang.
@@ -22,3 +23,4 @@ export const app = new Elysia()
     .use(transactionRoutes)
     .use(customerRoutes)
     .use(reportRoutes)
+    .use(exportRoutes)

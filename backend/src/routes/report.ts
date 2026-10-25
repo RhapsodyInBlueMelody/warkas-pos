@@ -11,7 +11,7 @@ const ZERO = () => new Prisma.Decimal(0)
 // ---------- tanggal ----------
 
 /** "2026-10-24" -> ms UTC tengah malam untuk tanggal kalender itu, atau null bila tanggalnya tidak ada. */
-function parseLocalDate(date: string): number | null {
+export function parseLocalDate(date: string): number | null {
     const [y, m, d] = date.split('-').map(Number)
     const ms = Date.UTC(y, m - 1, d)
     const probe = new Date(ms)
@@ -23,7 +23,7 @@ function parseLocalDate(date: string): number | null {
 const isoDate = (ms: number) => new Date(ms).toISOString().slice(0, 10)
 
 /** Rentang [from, to) dalam UTC untuk hari-hari kalender lokal [startMs, endMs) (ms UTC tengah malam). */
-function utcRange(startMs: number, endMs: number, tzOffsetMin: number) {
+export function utcRange(startMs: number, endMs: number, tzOffsetMin: number) {
     return {
         from: new Date(startMs - tzOffsetMin * 60_000),
         to: new Date(endMs - tzOffsetMin * 60_000),
@@ -33,7 +33,7 @@ function utcRange(startMs: number, endMs: number, tzOffsetMin: number) {
 /** Tanggal kalender lokal (YYYY-MM-DD) dari sebuah waktu UTC. */
 const localDay = (at: Date, tzOffsetMin: number) => isoDate(at.getTime() + tzOffsetMin * 60_000)
 
-const todayIn = (tzOffsetMin: number) => isoDate(Date.now() + tzOffsetMin * 60_000)
+export const todayIn = (tzOffsetMin: number) => isoDate(Date.now() + tzOffsetMin * 60_000)
 
 // ---------- data dan ringkasan ----------
 
@@ -47,7 +47,7 @@ type ItemRow = {
 }
 type PayRow = { amount: Prisma.Decimal; createdAt: Date }
 
-async function loadRange(storeId: string, range: { from: Date; to: Date }) {
+export async function loadRange(storeId: string, range: { from: Date; to: Date }) {
     const where = { storeId, createdAt: { gte: range.from, lt: range.to } }
     const [transactions, items, payments] = await Promise.all([
         prisma.transaction.findMany({
@@ -74,7 +74,7 @@ async function loadRange(storeId: string, range: { from: Date; to: Date }) {
 }
 
 /** Sisa seluruh utang pelanggan saat ini (bukan hanya pada rentang laporan). */
-async function debtOutstanding(storeId: string) {
+export async function debtOutstanding(storeId: string) {
     const ledger = await prisma.debtEntry.groupBy({
         by: ['type'],
         where: { storeId },
@@ -88,7 +88,7 @@ async function debtOutstanding(storeId: string) {
     return Number(total)
 }
 
-function summarize(transactions: TrxRow[], items: ItemRow[], payments: PayRow[]) {
+export function summarize(transactions: TrxRow[], items: ItemRow[], payments: PayRow[]) {
     let revenue = ZERO()
     const byPayment: Record<PaymentMethod, { count: number; revenue: Prisma.Decimal }> = {
         CASH: { count: 0, revenue: ZERO() },
