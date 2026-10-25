@@ -1,68 +1,81 @@
-export interface ReceiptItem {
-    quantity: number;
-    priceAtTime: number;
-    product: {
-        name: string;
-        code: string;
-    };
+import type { PaymentMethod } from './api'
+
+export type ReceiptData = {
+    storeName: string
+    code: string
+    createdAt: string
+    kasirName?: string
+    paymentMethod: PaymentMethod
+    customerName?: string | null
+    items: Array<{ name: string; quantity: number; price: number }>
+    total: number
+    cashReceived?: number // hanya untuk tunai
 }
 
-export interface ReceiptData {
-    code: string;
-    totalPrice: number;
-    createdAt: string;
-    paymentMethod: string;
-    items: ReceiptItem[];
+export const PAYMENT_LABEL: Record<PaymentMethod, string> = {
+    CASH: 'Tunai',
+    QRIS: 'QRIS',
+    TRANSFER: 'Transfer',
+    BON: 'Bon (utang)',
 }
 
-export const generateReceiptText = (trx: ReceiptData): string => {
-    const WIDTH = 32; // Standar lebar karakter printer thermal 58mm
-    const separator = "-".repeat(WIDTH) + "\n";
+const WIDTH = 32 // printer thermal 58mm
 
-    let r = "";
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des']
 
-    // 1. Header (Rata Tengah Manual)
-    const title = "KOPERASI POS";
-    const subTitle = "Kantin Kampus Unesa";
-    r += " ".repeat(Math.max(0, Math.floor((WIDTH - title.length) / 2))) + title + "\n";
-    r += " ".repeat(Math.max(0, Math.floor((WIDTH - subTitle.length) / 2))) + subTitle + "\n";
-    r += separator;
+const num = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 
-    // 2. Metadata Transaksi
-    r += `Nota : ${trx.code}\n`;
-    const tanggal = new Date(trx.createdAt).toLocaleDateString('id-ID', {
-        day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-    });
-    r += `Tgl  : ${tanggal}\n`;
-    r += `Bayar: ${trx.paymentMethod}\n`;
-    r += separator;
+const center = (text: string) => ' '.repeat(Math.max(0, Math.floor((WIDTH - text.length) / 2))) + text
 
-    // 3. Looping Items Belanjaan
-    trx.items.forEach((item) => {
-        // Nama produk (potong kalau kepanjangan biar gak ngerusak baris)
-        const name = item.product.name.substring(0, WIDTH);
-        r += `${name}\n`;
+/** Teks kiri dan kanan dalam satu baris; bila tak muat, kiri dipotong supaya angka tidak terpotong. */
+function pair(left: string, right: string) {
+    const room = WIDTH - right.length - 1
+    const l = left.length > room ? left.slice(0, Math.max(0, room)) : left
+    return l + ' '.repeat(Math.max(1, WIDTH - l.length - right.length)) + right
+}
 
-        // Baris kalkulasi: "2 x 10,000" dan "20,000"
-        const qtyPrice = `${item.quantity} x ${item.priceAtTime.toLocaleString('id-ID')}`;
-        const totalItem = (item.quantity * item.priceAtTime).toLocaleString('id-ID');
+/** Nama panjang dibungkus ke beberapa baris, bukan dipotong. */
+function wrap(text: string) {
+    const lines: string[] = []
+    let rest = text.trim()
+    while (rest.length > WIDTH) {
+        const cut = rest.lastIndexOf(' ', WIDTH)
+        const at = cut > 0 ? cut : WIDTH
+        lines.push(rest.slice(0, at))
+        rest = rest.slice(at).trim()
+    }
+    lines.push(rest)
+    return lines
+}
 
-        // Hitung sisa spasi agar totalItem rata kanan
-        const sisaSpasi = WIDTH - qtyPrice.length - totalItem.length;
-        r += qtyPrice + " ".repeat(sisaSpasi > 0 ? sisaSpasi : 1) + totalItem + "\n";
-    });
+export function generateReceiptText(r: ReceiptData): string {
+    const line = '-'.repeat(WIDTH)
+    const d = new Date(r.createdAt)
+    const pad = (x: number) => String(x).padStart(2, '0')
+    const when = `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()} ${pad(d.getHours())}.${pad(d.getMinutes())}`
 
-    r += separator;
+    const out: string[] = []
+    out.push(...wrap(r.storeName).map(center))
+    out.push(line)
+    out.push(pair('Nota', r.code))
+    out.push(pair('Waktu', when))
+    if (r.kasirName) out.push(pair('Kasir', r.kasirName))
+    out.push(line)
 
-    // 4. Footer & Total Harga
-    const totalLabel = "TOTAL BANYAKNYA:";
-    const grandTotal = trx.totalPrice.toLocaleString('id-ID');
-    const sisaSpasiTotal = WIDTH - totalLabel.length - grandTotal.length;
-    r += totalLabel + " ".repeat(sisaSpasiTotal > 0 ? sisaSpasiTotal : 1) + grandTotal + "\n";
+    for (const item of r.items) {
+        out.push(...wrap(item.name))
+        out.push(pair(`${item.quantity} x ${num(item.price)}`, num(item.quantity * item.price)))
+    }
 
-    r += separator;
-    const footerMsg = "Terima Kasih Atas Kunjungan Anda";
-    r += " ".repeat(Math.max(0, Math.floor((WIDTH - footerMsg.length) / 2))) + footerMsg + "\n\n\n";
-
-    return r;
-};
+    out.push(line)
+    out.push(pair('TOTAL', `Rp ${num(r.total)}`))
+    out.push(pair('Bayar', PAYMENT_LABEL[r.paymentMethod]))
+    if (r.paymentMethod === 'CASH' && r.cashReceived && r.cashReceived >= r.total) {
+        out.push(pair('Diterima', `Rp ${num(r.cashReceived)}`))
+        out.push(pair('Kembali', `Rp ${num(r.cashReceived - r.total)}`))
+    }
+    if (r.paymentMethod === 'BON' && r.customerName) out.push(pair('Pelanggan', r.customerName))
+    out.push(line)
+    out.push(center('Terima kasih'))
+    return out.join('\n')
+}

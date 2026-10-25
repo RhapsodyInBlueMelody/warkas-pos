@@ -1,5 +1,7 @@
 import * as React from 'react'
-import { RefreshControl, ScrollView, View } from 'react-native'
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native'
+import type { NativeStackScreenProps } from '@react-navigation/native-stack'
+import type { RootParams } from '../navigation'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useQuery } from '@tanstack/react-query'
 import { colors, radius, space } from '../theme'
@@ -51,7 +53,14 @@ function Stat({ label, children }: { label: string; children: React.ReactNode })
     )
 }
 
-export default function DashboardScreen() {
+type MenuItem = { label: string; hint: string; route: keyof RootParams; ownerOnly?: boolean }
+
+const MENU: MenuItem[] = [
+    { label: 'Kasir', hint: 'Jual dan catat transaksi', route: 'Kasir' },
+    { label: 'Riwayat', hint: 'Transaksi dan struk', route: 'Riwayat' },
+]
+
+export default function DashboardScreen({ navigation }: NativeStackScreenProps<RootParams, 'Dashboard'>) {
     const session = getSession()
     const isOwner = session?.user.role === 'ADMIN'
 
@@ -91,6 +100,23 @@ export default function DashboardScreen() {
                 </Row>
 
                 <PlanCard plan={plan.data} />
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
+                    {MENU.filter(m => isOwner || !m.ownerOnly).map(m => (
+                        <Pressable
+                            key={m.route}
+                            onPress={() => (navigation.navigate as (r: string) => void)(m.route)}
+                            style={({ pressed }) => ({
+                                flexBasis: '47%', flexGrow: 1, backgroundColor: m.route === 'Kasir' ? colors.ink : colors.card,
+                                borderRadius: radius.lg, borderWidth: 1, borderColor: m.route === 'Kasir' ? colors.ink : colors.line,
+                                padding: space.lg, minHeight: 92, opacity: pressed ? 0.85 : 1,
+                            })}
+                        >
+                            <Text weight="bold" size={18} color={m.route === 'Kasir' ? colors.white : colors.ink}>{m.label}</Text>
+                            <Text size={12} color={m.route === 'Kasir' ? '#C9D1E0' : colors.inkSoft} style={{ marginTop: 2 }}>{m.hint}</Text>
+                        </Pressable>
+                    ))}
+                </View>
 
                 {isOwner ? (
                     <Card>

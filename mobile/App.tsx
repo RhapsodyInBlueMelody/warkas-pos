@@ -18,16 +18,14 @@ import { getSession, loadSession, subscribe, type Session } from './services/ses
 import LoginScreen from './screens/LoginScreen'
 import RegisterScreen from './screens/RegisterScreen'
 import DashboardScreen from './screens/DashboardScreen'
+import KasirScreen from './screens/KasirScreen'
+import RiwayatScreen from './screens/RiwayatScreen'
+import StrukScreen from './screens/StrukScreen'
+import type { RootParams } from './navigation'
 
 const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 })
-
-export type RootParams = {
-    Login: undefined
-    Register: undefined
-    Dashboard: undefined
-}
 
 const Stack = createNativeStackNavigator<RootParams>()
 
@@ -72,7 +70,12 @@ export default function App() {
                         mengosongkan sesi, dan navigator otomatis kembali ke layar masuk. */}
                     <Stack.Navigator screenOptions={screenOptions}>
                         {session ? (
-                            <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
+                            <>
+                                <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
+                                <Stack.Screen name="Kasir" component={KasirScreen} options={{ title: 'Kasir' }} />
+                                <Stack.Screen name="Riwayat" component={RiwayatScreen} options={{ title: 'Riwayat transaksi' }} />
+                                <Stack.Screen name="Struk" component={StrukScreen} options={{ headerShown: false }} />
+                            </>
                         ) : (
                             <>
                                 <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />

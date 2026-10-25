@@ -11,7 +11,7 @@ Warkas adalah kasir digital multi-toko untuk warung dan toko kecil. Basis kodeny
 - [x] M2 Harga modal, laporan untung harian, penanda stok menipis (18 tes lulus)
 - [x] M3 Buku bon (utang pelanggan) (29 tes lulus)
 - [x] M4 Paket gratis/Toko: trial 14 hari, kedaluwarsa, batas 50 produk, kunci bon, `GET /plan`, aktivasi manual (M4a); laporan mingguan/bulanan (M4b); ekspor Excel (M4c). Tidak ada pembayaran otomatis. 54 tes lulus
-- [ ] M5 Aplikasi mobile. Selesai: M5a (tema Warkas, API client, sesi, login, daftar toko, dashboard). Belum: M5b kasir + riwayat + struk, M5c bon, produk, laporan, paket/upgrade, ekspor
+- [ ] M5 Aplikasi mobile. Selesai: M5a (tema, API client, sesi, login, daftar toko, dashboard), M5b (kasir, riwayat, struk). Belum: M5c bon, produk, laporan, paket/upgrade, ekspor
 - [ ] M6 Samakan proposal dan landing page dengan fitur yang benar-benar jadi
 
 ## Keputusan
@@ -91,10 +91,18 @@ bun prisma/seed.ts     # data demo: username demo / demo.kasir, password demo123
 
 ## Catatan M5a (mobile: fondasi)
 
-- Layar KOSAI lama (Dashboard, Product, History, TransactionSuccess, Login) dihapus; kasir dan riwayat ditulis ulang di M5b. Sampai M5b selesai, app mobile hanya bisa daftar toko, masuk, dan melihat dashboard.
+- Layar KOSAI lama (Dashboard, Product, History, TransactionSuccess, Login) dihapus; kasir dan riwayat ditulis ulang di M5b. 
 - Tema di `theme.ts` (palet dan font sama dengan landing page), komponen dasar di `ui.tsx`. `react-native-paper`, vector-icons, blur, gradient, Inter, Poppins dibuang.
 - Alamat backend lewat `EXPO_PUBLIC_API_URL` (bawaan `http://10.0.2.2:3000` untuk emulator Android; HP asli pakai IP komputer).
 - Sesi disimpan di `expo-secure-store` (terenkripsi). Aturan sesi 3 menit milik KOSAI dibuang; sesi berakhir saat server membalas 401 (token berlaku 24 jam), lalu navigator kembali ke layar masuk otomatis dan cache data dihapus.
 - Batas hari laporan memakai zona waktu perangkat (`tzOffset`).
 - Diverifikasi: typecheck bersih; pratinjau web di Chromium terhadap backend + data demo (login salah/kosong, daftar, dashboard pemilik). Belum: Android asli, dashboard kasir, toko paket gratis.
 - Kunci SecureStore tidak jalan di web, jadi di pratinjau web sesi hilang saat reload (di Android tersimpan).
+
+## Catatan M5b (mobile: kasir)
+
+- Kasir: cari produk, keranjang (jumlah dibatasi stok), bayar Tunai/QRIS/Transfer/Bon. Tunai punya kolom uang diterima dan kembalian (hanya tampil di struk, tidak disimpan di server). Bon memilih atau menambah pelanggan; di paket gratis tombol Bon bertanda "Toko" dan menampilkan ajakan upgrade (dan 402 dari server juga ditangani).
+- Struk: teks monospace lebar 32 karakter, dibagikan lewat Share bawaan (mis. ke WhatsApp). Cetak thermal Bluetooth belum ada (placeholder KOSAI dihapus, bukan dipalsukan).
+- Waktu di struk setelah checkout memakai jam perangkat; riwayat memakai waktu server.
+- `constants/app.ts`: nomor WhatsApp admin untuk aktivasi lewat `EXPO_PUBLIC_UPGRADE_WHATSAPP`. Kosong sampai ada nomor sungguhan; tanpa nomor tombol "Hubungi admin" tidak muncul.
+- Diverifikasi di pratinjau web terhadap backend asli: tunai dengan kembalian, bon (saldo Bu Ani 20.000 -> 23.500, stok 98 -> 97 sesuai database), riwayat, toko paket gratis (bon terkunci). Belum: Android asli, dashboard kasir (peran KASIR), stok habis/melebihi stok di UI.
