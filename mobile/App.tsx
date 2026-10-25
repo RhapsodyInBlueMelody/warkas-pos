@@ -21,6 +21,10 @@ import DashboardScreen from './screens/DashboardScreen'
 import KasirScreen from './screens/KasirScreen'
 import RiwayatScreen from './screens/RiwayatScreen'
 import StrukScreen from './screens/StrukScreen'
+import ProdukScreen from './screens/ProdukScreen'
+import ProdukFormScreen from './screens/ProdukFormScreen'
+import BonScreen from './screens/BonScreen'
+import PelangganScreen from './screens/PelangganScreen'
 import type { RootParams } from './navigation'
 
 const queryClient = new QueryClient({
@@ -74,6 +78,11 @@ export default function App() {
                                 <Stack.Screen name="Dashboard" component={DashboardScreen} options={{ headerShown: false }} />
                                 <Stack.Screen name="Kasir" component={KasirScreen} options={{ title: 'Kasir' }} />
                                 <Stack.Screen name="Riwayat" component={RiwayatScreen} options={{ title: 'Riwayat transaksi' }} />
+ 
+                                <Stack.Screen name="Produk" component={ProdukScreen} options={{ title: 'Produk' }} />
+                                <Stack.Screen name="ProdukForm" component={ProdukFormScreen} options={({ route }) => ({ title: route.params.product ? 'Ubah produk' : 'Produk baru' })} />
+                                <Stack.Screen name="Bon" component={BonScreen} options={{ title: 'Buku bon' }} />
+                                <Stack.Screen name="Pelanggan" component={PelangganScreen} options={({ route }) => ({ title: route.params.name })} />
                                 <Stack.Screen name="Struk" component={StrukScreen} options={{ headerShown: false }} />
                             </>
                         ) : (

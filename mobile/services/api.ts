@@ -241,6 +241,11 @@ export const payDebt = (customerId: string, amount: number, note?: string) =>
 // Batas hari laporan mengikuti zona waktu perangkat (WIB/WITA/WIT), bukan tebakan server.
 export const tzOffsetMinutes = () => -new Date().getTimezoneOffset()
 
+export const addCharge = (customerId: string, amount: number, note?: string) =>
+    request<{ balance: number }>('POST', `/customers/${customerId}/charges`, {
+        body: { amount, ...(note ? { note } : {}) },
+    })
+
 export const getDailyReport = (date?: string) =>
     request<DailyReport>('GET', '/reports/daily', { query: { date, tzOffset: tzOffsetMinutes() } })
 

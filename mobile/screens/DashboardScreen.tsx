@@ -58,6 +58,8 @@ type MenuItem = { label: string; hint: string; route: keyof RootParams; ownerOnl
 const MENU: MenuItem[] = [
     { label: 'Kasir', hint: 'Jual dan catat transaksi', route: 'Kasir' },
     { label: 'Riwayat', hint: 'Transaksi dan struk', route: 'Riwayat' },
+    { label: 'Produk', hint: 'Stok dan harga', route: 'Produk' },
+    { label: 'Buku bon', hint: 'Utang pelanggan', route: 'Bon' },
 ]
 
 export default function DashboardScreen({ navigation }: NativeStackScreenProps<RootParams, 'Dashboard'>) {

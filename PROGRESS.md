@@ -11,7 +11,7 @@ Warkas adalah kasir digital multi-toko untuk warung dan toko kecil. Basis kodeny
 - [x] M2 Harga modal, laporan untung harian, penanda stok menipis (18 tes lulus)
 - [x] M3 Buku bon (utang pelanggan) (29 tes lulus)
 - [x] M4 Paket gratis/Toko: trial 14 hari, kedaluwarsa, batas 50 produk, kunci bon, `GET /plan`, aktivasi manual (M4a); laporan mingguan/bulanan (M4b); ekspor Excel (M4c). Tidak ada pembayaran otomatis. 54 tes lulus
-- [ ] M5 Aplikasi mobile. Selesai: M5a (tema, API client, sesi, login, daftar toko, dashboard), M5b (kasir, riwayat, struk). Belum: M5c bon, produk, laporan, paket/upgrade, ekspor
+- [ ] M5 Aplikasi mobile. Selesai: M5a (tema, API client, sesi, login, daftar toko, dashboard), M5b (kasir, riwayat, struk), M5c-1 (produk, buku bon). Belum: laporan, layar paket/upgrade, ekspor Excel, staf
 - [ ] M6 Samakan proposal dan landing page dengan fitur yang benar-benar jadi
 
 ## Keputusan
@@ -106,3 +106,9 @@ bun prisma/seed.ts     # data demo: username demo / demo.kasir, password demo123
 - Waktu di struk setelah checkout memakai jam perangkat; riwayat memakai waktu server.
 - `constants/app.ts`: nomor WhatsApp admin untuk aktivasi lewat `EXPO_PUBLIC_UPGRADE_WHATSAPP`. Kosong sampai ada nomor sungguhan; tanpa nomor tombol "Hubungi admin" tidak muncul.
 - Diverifikasi di pratinjau web terhadap backend asli: tunai dengan kembalian, bon (saldo Bu Ani 20.000 -> 23.500, stok 98 -> 97 sesuai database), riwayat, toko paket gratis (bon terkunci). Belum: Android asli, dashboard kasir (peran KASIR), stok habis/melebihi stok di UI.
+
+## Catatan M5c-1 (mobile: produk dan bon)
+
+- Produk: daftar + cari + filter stok menipis; pemilik bisa tambah/ubah (harga modal, batas stok menipis); kasir hanya melihat dan tidak melihat modal. Batas 50 produk paket gratis ditampilkan dan 402 `PLAN_LIMIT` memunculkan ajakan upgrade. Harga modal yang sudah diisi tidak bisa dikosongkan lagi (server tidak mendukung).
+- Buku bon: total utang, daftar pelanggan, detail dengan riwayat utang/bayar, catat pembayaran (tombol Lunasi, melebihi utang ditolak di UI dan server), pemilik bisa menambah utang manual. Di paket gratis, melihat dan membayar bon lama tetap bisa; pelanggan baru memunculkan ajakan upgrade.
+- Diverifikasi di pratinjau web terhadap backend asli (hasil dicocokkan ke database lewat API). Belum: Android asli, tampilan peran KASIR untuk layar ini, hapus produk (belum ada di UI).
