@@ -1,6 +1,7 @@
 import { Elysia } from 'elysia'
 import { prisma } from '../lib/prisma'
 import { authMiddleware } from '../middleware/auth'
+import { planView } from '../lib/plan'
 
 export const profileRoutes = new Elysia()
     .use(authMiddleware)
@@ -17,7 +18,9 @@ export const profileRoutes = new Elysia()
                 username: true,
                 role: true,
                 createdAt: true,
-                store: { select: { storeId: true, name: true, plan: true } },
+                store: {
+                    select: { storeId: true, name: true, plan: true, planExpiresAt: true, planIsTrial: true }
+                },
             }
         })
 
@@ -26,5 +29,10 @@ export const profileRoutes = new Elysia()
             return { message: 'Profile not found' }
         }
 
-        return { profile }
+        return {
+            profile: {
+                ...profile,
+                store: { storeId: profile.store.storeId, name: profile.store.name, ...planView(profile.store) },
+            }
+        }
     })

@@ -23,7 +23,8 @@ async function main() {
 
     const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10)
 
-    const store = await prisma.store.create({ data: { name: 'Warung Demo' } })
+    // Demo memakai paket Toko tanpa batas waktu supaya semua fitur terlihat.
+    const store = await prisma.store.create({ data: { name: 'Warung Demo', plan: 'TOKO' } })
 
     const owner = await prisma.user.create({
         data: {

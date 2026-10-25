@@ -3,6 +3,7 @@ import { Elysia, t } from 'elysia'
 import { jwt } from '@elysiajs/jwt'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
+import { DAY_MS, TRIAL_DAYS, planView } from '../lib/plan'
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 24
 
@@ -37,8 +38,14 @@ export const authRoutes = new Elysia()
 
         try {
             const { store, user } = await prisma.$transaction(async (tx) => {
+                // Toko baru langsung mendapat masa percobaan paket Toko, lalu otomatis turun ke gratis.
                 const store = await tx.store.create({
-                    data: { name: body.storeName.trim() }
+                    data: {
+                        name: body.storeName.trim(),
+                        plan: 'TOKO',
+                        planIsTrial: true,
+                        planExpiresAt: new Date(Date.now() + TRIAL_DAYS * DAY_MS),
+                    }
                 })
                 const user = await tx.user.create({
                     data: {
@@ -59,7 +66,7 @@ export const authRoutes = new Elysia()
                 message: 'Toko berhasil dibuat',
                 token,
                 user: { name: user.name, role: user.role, username: user.username },
-                store: { storeId: store.storeId, name: store.name, plan: store.plan }
+                store: { storeId: store.storeId, name: store.name, ...planView(store) }
             }
         } catch (e: unknown) {
             if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
@@ -82,7 +89,11 @@ export const authRoutes = new Elysia()
 
         const user = await prisma.user.findUnique({
             where: { username },
-            include: { store: { select: { storeId: true, name: true, plan: true } } }
+            include: {
+                store: {
+                    select: { storeId: true, name: true, plan: true, planExpiresAt: true, planIsTrial: true }
+                }
+            }
         })
 
         const isPasswordValid = await bcrypt.compare(
@@ -105,7 +116,7 @@ export const authRoutes = new Elysia()
                 role: user.role,
                 username: user.username
             },
-            store: user.store
+            store: { storeId: user.store.storeId, name: user.store.name, ...planView(user.store) }
         }
     }, {
         body: t.Object({

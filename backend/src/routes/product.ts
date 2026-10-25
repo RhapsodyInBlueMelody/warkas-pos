@@ -3,6 +3,9 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { authMiddleware } from '../middleware/auth'
 import { genCode } from '../lib/ids'
+import { FREE_MAX_PRODUCTS, effectivePlan } from '../lib/plan'
+
+class PlanLimitError extends Error {}
 
 function isOwner(user: { role: string }): boolean {
     return user.role === 'ADMIN'
@@ -171,19 +174,44 @@ export const getProductRoutes = new Elysia()
         }
 
         try {
-            const product = await prisma.product.create({
-                data: {
-                    ...body,
-                    code: body.code?.trim() || genCode('PRD'),
-                    storeId: user.storeId,
-                    createdBy: user.userId,
-                    updatedBy: user.userId,
+            const product = await prisma.$transaction(async (tx) => {
+                // Kunci baris toko supaya hitung-lalu-buat tidak bisa dilompati oleh
+                // permintaan yang masuk bersamaan (kalau tidak, batas produk bisa terlewati).
+                await tx.$queryRaw`SELECT "storeId" FROM "Store" WHERE "storeId" = ${user.storeId} FOR UPDATE`
+
+                const store = await tx.store.findUniqueOrThrow({
+                    where: { storeId: user.storeId },
+                    select: { plan: true, planExpiresAt: true },
+                })
+                if (effectivePlan(store) === 'FREE') {
+                    const count = await tx.product.count({ where: { storeId: user.storeId } })
+                    if (count >= FREE_MAX_PRODUCTS) throw new PlanLimitError()
                 }
+
+                return tx.product.create({
+                    data: {
+                        ...body,
+                        code: body.code?.trim() || genCode('PRD'),
+                        storeId: user.storeId,
+                        createdBy: user.userId,
+                        updatedBy: user.userId,
+                    }
+                })
             })
 
             set.status = 201
             return { product: present(product, user.role) }
         } catch (e: unknown) {
+            if (e instanceof PlanLimitError) {
+                set.status = 402
+                return {
+                    message: `Paket gratis dibatasi ${FREE_MAX_PRODUCTS} produk. Upgrade ke paket Toko untuk menambah lebih banyak.`,
+                    code: 'PLAN_LIMIT',
+                    feature: 'products',
+                    limit: FREE_MAX_PRODUCTS,
+                    upgradeTo: 'TOKO',
+                }
+            }
             if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
                 set.status = 409
                 return { message: 'Product code already exists' }

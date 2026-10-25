@@ -2,6 +2,7 @@ import { Elysia, t } from 'elysia'
 import { Prisma } from '@prisma/client'
 import { prisma } from '../lib/prisma'
 import { authMiddleware } from '../middleware/auth'
+import { requireFeature } from '../lib/plan'
 
 const ZERO = () => new Prisma.Decimal(0)
 
@@ -78,6 +79,14 @@ export const customerRoutes = new Elysia()
         })
     })
     .post('/customers', async ({ user, set, body }) => {
+        // Pelanggan baru berarti bon baru: hanya paket Toko. Melihat dan membayar bon lama tetap bebas
+        // agar toko yang turun paket tidak terjebak dengan utang pelanggan yang tidak bisa ditagih.
+        const denied = await requireFeature(user.storeId, 'bon')
+        if (denied) {
+            set.status = denied.status
+            return denied.body
+        }
+
         const customer = await prisma.customer.create({
             data: {
                 name: body.name.trim(),
@@ -216,6 +225,12 @@ export const customerRoutes = new Elysia()
         if (user.role !== 'ADMIN') {
             set.status = 403
             return { message: 'Forbidden' }
+        }
+
+        const denied = await requireFeature(user.storeId, 'bon')
+        if (denied) {
+            set.status = denied.status
+            return denied.body
         }
 
         const customer = await prisma.customer.findFirst({

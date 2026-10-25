@@ -21,6 +21,9 @@ model Store {
   storeId   String   @id @default(uuid())
   name      String
   plan      Plan     @default(FREE)
+  // Paket TOKO berlaku sampai planExpiresAt (null = tanpa batas waktu); lewat dari itu dianggap FREE.
+  planExpiresAt DateTime?
+  planIsTrial   Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

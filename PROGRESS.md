@@ -10,7 +10,7 @@ Warkas adalah kasir digital multi-toko untuk warung dan toko kecil. Basis kodeny
 - [x] M1 Multi-tenant: `Store`, `storeId` di semua tabel, kode unik per toko, JWT membawa `storeId`, `POST /register`, isolasi data + tes lintas toko (12 tes lulus di Postgres 16 lokal)
 - [x] M2 Harga modal, laporan untung harian, penanda stok menipis (18 tes lulus)
 - [x] M3 Buku bon (utang pelanggan) (29 tes lulus)
-- [ ] M4 Batas paket gratis (50 barang), ekspor Excel. Paket berbayar hanya flag di database (belum ada pembayaran)
+- [ ] M4 Paket gratis/Toko. Selesai: M4a (trial 14 hari, kedaluwarsa, batas 50 produk, kunci bon, `GET /plan`, aktivasi manual). Belum: M4b laporan mingguan/bulanan, M4c ekspor Excel. Tidak ada pembayaran otomatis
 - [ ] M5 Aplikasi mobile: rebrand ke Warkas, layar daftar toko, bon, laporan
 - [ ] M6 Samakan proposal dan landing page dengan fitur yang benar-benar jadi
 
@@ -64,3 +64,13 @@ bun prisma/seed.ts     # data demo: username demo / demo.kasir, password demo123
 - Pembayaran melebihi sisa utang ditolak (400). Pembayaran memakai `SELECT ... FOR UPDATE` pada baris pelanggan; tes balapan 12 pembayaran serentak gagal bila kunci itu dibuang (diverifikasi dengan mutasi manual). Tes balapan stok checkout (20 serentak) juga diperkuat dan diverifikasi dengan cara yang sama.
 - Laporan harian kini memuat `byPayment.BON`, `debtPaymentsReceived`, `cashIn` (uang yang benar-benar masuk), dan `debtOutstanding`. `revenue` dan `profit` tetap berbasis penjualan (termasuk bon).
 - Belum ada: batas kredit per pelanggan, pengingat tagihan, hapus/gabung pelanggan, koreksi pembayaran yang salah catat (saat ini hanya bisa dikoreksi dengan CHARGE manual oleh pemilik).
+
+## Catatan M4a (paket)
+
+- Keputusan: naik paket lewat **aktivasi manual** oleh pemilik platform (`bun scripts/set-plan.ts <storeId|username> TOKO <hari|forever>`), toko baru dapat **trial 14 hari** paket Toko, batas produk gratis **50**. Tidak ada payment gateway (tidak bisa diuji di lingkungan Claude).
+- Migrasi `20261025000000_add_plan_expiry`: `Store.planExpiresAt`, `Store.planIsTrial`. Paket TOKO yang lewat `planExpiresAt` otomatis dianggap FREE (`effectivePlan`), tanpa tugas terjadwal; kolom `plan` menyimpan paket terakhir yang diaktifkan.
+- Server menegakkan batas: produk ke-51 di paket gratis ditolak `402 {code:"PLAN_LIMIT", limit:50}` (hitung dan buat dalam satu transaksi dengan `FOR UPDATE` pada baris toko). Fitur terkunci mengembalikan `402 {code:"PLAN_REQUIRED", feature, upgradeTo:"TOKO"}`.
+- Kunci bon: `POST /customers`, `POST /customers/:id/charges`, dan checkout `BON` butuh paket Toko. Melihat pelanggan dan mencatat pembayaran bon lama tetap bebas di paket gratis agar toko yang turun paket tidak terjebak dengan utang yang tak bisa ditagih. Produk berlebih tidak dihapus saat turun paket; hanya tidak bisa menambah.
+- `GET /plan` (semua peran): paket berlaku, `isTrial`, `daysLeft`, batas, pemakaian, fitur. `login`, `register`, dan `profile` juga memuat info paket.
+- Tes: balapan batas produk (20 permintaan serentak, kuota 5) diverifikasi gagal bila kunci `FOR UPDATE` dibuang.
+- **Untuk M6 (landing page dan proposal):** sebutkan trial 14 hari; paket Toko diaktifkan manual (bukan bayar di aplikasi); batas gratis 50 produk sudah sesuai.

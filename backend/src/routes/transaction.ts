@@ -2,6 +2,7 @@ import { Elysia, t } from 'elysia';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { authMiddleware } from '../middleware/auth';
+import { requireFeature } from '../lib/plan';
 
 const transactionItemSchema = t.Object({
     productId: t.String({ minLength: 1 }),
@@ -36,6 +37,13 @@ export const transactionRoutes = new Elysia()
             if (paymentMethod !== 'BON' && customerId) {
                 set.status = 400;
                 return { message: 'Transaksi Gagal!', detail: 'Pelanggan hanya dipakai untuk transaksi bon.' };
+            }
+            if (paymentMethod === 'BON') {
+                const denied = await requireFeature(storeId, 'bon');
+                if (denied) {
+                    set.status = denied.status;
+                    return denied.body;
+                }
             }
 
             const productIds = new Set(items.map(item => item.productId));
